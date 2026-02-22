@@ -1,5 +1,5 @@
 name: 'PipelineLens'
-description: 'Instant pipeline failure analysis — automatically detects root cause and posts fix suggestions on your PR'
+description: 'Instant pipeline failure analysis — pattern matching + AI fallback via GitHub Models'
 author: 'PipelineLens'
 
 branding:
@@ -8,7 +8,7 @@ branding:
 
 inputs:
   github-token:
-    description: 'GitHub token for posting PR comments'
+    description: 'GitHub token for posting PR comments and GitHub Models AI'
     required: true
     default: ${{ github.token }}
   post-comment:
@@ -20,17 +20,31 @@ inputs:
     required: false
     default: 'true'
   failed-job-name:
-    description: 'Name of the failed job to analyze (optional, analyzes all if not set)'
+    description: 'Name of the failed job to analyze (optional)'
     required: false
     default: ''
+  remote-patterns-url:
+    description: 'URL to fetch additional community patterns from'
+    required: false
+    default: ''
+  enable-ai:
+    description: 'Use GitHub Models AI as fallback when no pattern matches (uses your GITHUB_TOKEN — no extra API key needed)'
+    required: false
+    default: 'true'
 
 outputs:
   root-cause:
-    description: 'Plain-english root cause of the failure'
+    description: 'Plain-English root cause of the failure'
   failed-step:
     description: 'The step that caused the failure'
   suggestion:
     description: 'Suggested fix for the failure'
+  matched-pattern:
+    description: 'ID of the pattern that matched (or ai-generated / none)'
+  category:
+    description: 'Category of the failure'
+  ai-generated:
+    description: 'Whether the suggestion was AI-generated (true/false)'
 
 runs:
   using: 'node20'

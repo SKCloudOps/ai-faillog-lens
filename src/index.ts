@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { analyzeLogs } from './analyzer'
+import { loadPatterns, analyzeLogs } from './analyzer'
 import { formatPRComment, formatJobSummary } from './formatter'
 
 async function run(): Promise<void> {
@@ -9,30 +9,30 @@ async function run(): Promise<void> {
     const postComment = core.getInput('post-comment') === 'true'
     const postSummary = core.getInput('post-summary') === 'true'
     const failedJobName = core.getInput('failed-job-name')
+    const remotePatternsUrl = core.getInput('remote-patterns-url')
+    const enableAI = core.getInput('enable-ai') === 'true'
 
     const octokit = github.getOctokit(token)
     const context = github.context
     const { owner, repo } = context.repo
 
     core.info('🔍 PipelineLens: Starting failure analysis...')
+    core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`)
+
+    // Load patterns — local + optional remote
+    const patterns = await loadPatterns(remotePatternsUrl || undefined)
 
     const runId = context.runId
     const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`
-
-    // Context info for job summary
     const branch = context.ref.replace('refs/heads/', '')
     const commit = context.sha
     const triggeredBy = context.actor
     const repoFullName = `${owner}/${repo}`
 
-    // Fetch jobs for this run
     const { data: jobsData } = await octokit.rest.actions.listJobsForWorkflowRun({
-      owner,
-      repo,
-      run_id: runId
+      owner, repo, run_id: runId
     })
 
-    // Find failed jobs
     const failedJobs = jobsData.jobs.filter(job => {
       const isFailed = job.conclusion === 'failure'
       if (failedJobName) return isFailed && job.name === failedJobName
@@ -49,13 +49,10 @@ async function run(): Promise<void> {
     for (const job of failedJobs) {
       core.info(`📋 Analyzing job: ${job.name}`)
 
-      // Fetch logs
       let logs = ''
       try {
         const logsResponse = await octokit.rest.actions.downloadJobLogsForWorkflowRun({
-          owner,
-          repo,
-          job_id: job.id
+          owner, repo, job_id: job.id
         })
         logs = logsResponse.data as unknown as string
       } catch (err) {
@@ -67,41 +64,40 @@ async function run(): Promise<void> {
       }
 
       const failedStep = job.steps?.find(s => s.conclusion === 'failure')?.name
-      const analysis = analyzeLogs(logs, failedStep)
+
+      // Analyze — pattern match first, AI fallback if enabled and no match
+      const analysis = await analyzeLogs(logs, patterns, token, enableAI, failedStep)
 
       core.info(`🔍 Root cause: ${analysis.rootCause}`)
-      core.info(`💡 Suggestion: ${analysis.suggestion}`)
+      core.info(`📦 Category: ${analysis.category}`)
+      core.info(`🎯 Matched pattern: ${analysis.matchedPattern}`)
+      core.info(`🤖 AI generated: ${analysis.aiGenerated}`)
 
       // Set outputs
       core.setOutput('root-cause', analysis.rootCause)
       core.setOutput('failed-step', analysis.failedStep)
       core.setOutput('suggestion', analysis.suggestion)
+      core.setOutput('matched-pattern', analysis.matchedPattern)
+      core.setOutput('category', analysis.category)
+      core.setOutput('ai-generated', String(analysis.aiGenerated))
 
-      // Post rich job summary
+      // Post job summary
       if (postSummary) {
         const summary = formatJobSummary(
-          analysis,
-          job.name,
-          runUrl,
-          job.steps ?? [],
-          triggeredBy,
-          branch,
-          commit,
-          repoFullName
+          analysis, job.name, runUrl,
+          job.steps ?? [], triggeredBy, branch, commit, repoFullName
         )
         await core.summary.addRaw(summary).write()
         core.info('📊 Job summary posted.')
       }
 
-      // Post PR comment if this is a pull request
+      // Post PR comment
       if (postComment && context.payload.pull_request) {
         const prNumber = context.payload.pull_request.number
         const comment = formatPRComment(analysis, job.name, runUrl)
 
         const { data: comments } = await octokit.rest.issues.listComments({
-          owner,
-          repo,
-          issue_number: prNumber
+          owner, repo, issue_number: prNumber
         })
 
         const existingComment = comments.find(c =>
@@ -111,18 +107,12 @@ async function run(): Promise<void> {
 
         if (existingComment) {
           await octokit.rest.issues.updateComment({
-            owner,
-            repo,
-            comment_id: existingComment.id,
-            body: comment
+            owner, repo, comment_id: existingComment.id, body: comment
           })
           core.info('💬 Updated existing PR comment.')
         } else {
           await octokit.rest.issues.createComment({
-            owner,
-            repo,
-            issue_number: prNumber,
-            body: comment
+            owner, repo, issue_number: prNumber, body: comment
           })
           core.info('💬 Posted PR comment.')
         }

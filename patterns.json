@@ -1,0 +1,176 @@
+{
+  "version": "1.0.0",
+  "description": "PipelineLens error patterns — community maintained. Add your own patterns here!",
+  "patterns": [
+    {
+      "id": "docker-auth",
+      "category": "Docker",
+      "pattern": "unauthorized.*registry|denied.*requested access|authentication required",
+      "flags": "i",
+      "rootCause": "Docker registry authentication failed",
+      "suggestion": "Check your DOCKER_USERNAME and DOCKER_PASSWORD secrets are set correctly in repository settings (Settings → Secrets → Actions)",
+      "severity": "critical",
+      "tags": ["docker", "auth", "registry"]
+    },
+    {
+      "id": "docker-image-not-found",
+      "category": "Docker",
+      "pattern": "manifest.*not found|pull access denied|repository does not exist",
+      "flags": "i",
+      "rootCause": "Docker image or tag not found in registry",
+      "suggestion": "Verify the image name and tag exist in your registry. Check for typos in your image reference.",
+      "severity": "critical",
+      "tags": ["docker", "image", "registry"]
+    },
+    {
+      "id": "docker-no-space",
+      "category": "Docker",
+      "pattern": "no space left on device",
+      "flags": "i",
+      "rootCause": "Runner ran out of disk space",
+      "suggestion": "Add a disk cleanup step before your build: use 'docker system prune -f' or the 'jlumbroso/free-disk-space' action.",
+      "severity": "critical",
+      "tags": ["docker", "disk", "runner"]
+    },
+    {
+      "id": "docker-dockerfile-not-found",
+      "category": "Docker",
+      "pattern": "dockerfile.*not found|cannot find.*dockerfile",
+      "flags": "i",
+      "rootCause": "Dockerfile not found at specified path",
+      "suggestion": "Check the 'file' or 'context' path in your docker build step. Make sure the Dockerfile exists at that location.",
+      "severity": "critical",
+      "tags": ["docker", "dockerfile"]
+    },
+    {
+      "id": "gha-missing-secret",
+      "category": "GitHub Actions",
+      "pattern": "secret.*not.*set|Input required and not supplied",
+      "flags": "i",
+      "rootCause": "A required secret or input is missing",
+      "suggestion": "Go to Settings → Secrets → Actions and add the missing secret. Check the action's documentation for required inputs.",
+      "severity": "critical",
+      "tags": ["actions", "secret", "input"]
+    },
+    {
+      "id": "gha-permission",
+      "category": "GitHub Actions",
+      "pattern": "resource not accessible by integration|403.*github",
+      "flags": "i",
+      "rootCause": "GitHub token lacks required permissions",
+      "suggestion": "Add the required permissions to your workflow. Example: 'permissions: contents: write' or use a Personal Access Token with broader scopes.",
+      "severity": "critical",
+      "tags": ["actions", "permissions", "token"]
+    },
+    {
+      "id": "gha-timeout",
+      "category": "GitHub Actions",
+      "pattern": "timeout|timed out after",
+      "flags": "i",
+      "rootCause": "A step exceeded its timeout limit",
+      "suggestion": "Increase the 'timeout-minutes' for the step or job. Consider caching dependencies to speed up the pipeline.",
+      "severity": "warning",
+      "tags": ["actions", "timeout"]
+    },
+    {
+      "id": "npm-peer-dep",
+      "category": "Node.js",
+      "pattern": "npm ERR!.*peer dep|ERESOLVE",
+      "flags": "i",
+      "rootCause": "npm dependency conflict detected",
+      "suggestion": "Try adding --legacy-peer-deps flag to your npm install command, or update conflicting packages.",
+      "severity": "critical",
+      "tags": ["npm", "dependencies"]
+    },
+    {
+      "id": "npm-module-not-found",
+      "category": "Node.js",
+      "pattern": "cannot find module|module not found",
+      "flags": "i",
+      "rootCause": "A required Node.js module is missing",
+      "suggestion": "Run 'npm install' before your build step, or check that all dependencies are listed in package.json.",
+      "severity": "critical",
+      "tags": ["npm", "modules"]
+    },
+    {
+      "id": "npm-permission",
+      "category": "Node.js",
+      "pattern": "EACCES.*permission denied|EPERM",
+      "flags": "i",
+      "rootCause": "File permission error during npm install",
+      "suggestion": "Avoid running npm with sudo. Check if you need to set NODE_PATH or use a specific Node.js version via actions/setup-node.",
+      "severity": "critical",
+      "tags": ["npm", "permissions"]
+    },
+    {
+      "id": "test-failure",
+      "category": "Tests",
+      "pattern": "(\\d+) (test|spec|suite)s? failed|FAIL.*\\.test\\.|Tests Failed",
+      "flags": "i",
+      "rootCause": "One or more tests failed",
+      "suggestion": "Check the test output above for specific failing test names. Run the tests locally with the same environment variables to reproduce.",
+      "severity": "critical",
+      "tags": ["tests", "jest", "mocha"]
+    },
+    {
+      "id": "typescript-error",
+      "category": "Build",
+      "pattern": "TypeScript.*error|TS\\d{4}:",
+      "flags": "i",
+      "rootCause": "TypeScript compilation error",
+      "suggestion": "Fix the TypeScript errors shown above. Run 'tsc --noEmit' locally to see all errors before pushing.",
+      "severity": "critical",
+      "tags": ["typescript", "build"]
+    },
+    {
+      "id": "syntax-error",
+      "category": "Build",
+      "pattern": "syntax error|SyntaxError",
+      "flags": "i",
+      "rootCause": "Syntax error in code",
+      "suggestion": "Check the file and line number shown above for syntax errors. Run a linter locally to catch these before pushing.",
+      "severity": "critical",
+      "tags": ["syntax", "build"]
+    },
+    {
+      "id": "network-refused",
+      "category": "Network",
+      "pattern": "connection refused|ECONNREFUSED|network.*unreachable",
+      "flags": "i",
+      "rootCause": "Network connection failed",
+      "suggestion": "Check if the target service is running and accessible. For external services, verify the URL and port. Consider adding retry logic.",
+      "severity": "critical",
+      "tags": ["network", "connection"]
+    },
+    {
+      "id": "rate-limit",
+      "category": "Network",
+      "pattern": "rate limit.*exceeded|API rate limit",
+      "flags": "i",
+      "rootCause": "API rate limit exceeded",
+      "suggestion": "You have hit GitHub's API rate limit. Use GITHUB_TOKEN for authenticated requests (higher limits) or add delays between API calls.",
+      "severity": "warning",
+      "tags": ["network", "rate-limit", "github"]
+    },
+    {
+      "id": "k8s-image-pull",
+      "category": "Kubernetes",
+      "pattern": "imagepullbackoff|errimagepull",
+      "flags": "i",
+      "rootCause": "Kubernetes cannot pull the Docker image",
+      "suggestion": "Check the image name and tag. If using a private registry, ensure the imagePullSecret is configured correctly in your cluster.",
+      "severity": "critical",
+      "tags": ["kubernetes", "docker", "image"]
+    },
+    {
+      "id": "helm-failure",
+      "category": "Kubernetes",
+      "pattern": "helm.*failed|Error: UPGRADE FAILED",
+      "flags": "i",
+      "rootCause": "Helm chart deployment failed",
+      "suggestion": "Run 'helm status <release-name>' and 'kubectl describe pod' to get more details. Check if there are resource conflicts.",
+      "severity": "critical",
+      "tags": ["kubernetes", "helm"]
+    }
+  ]
+}

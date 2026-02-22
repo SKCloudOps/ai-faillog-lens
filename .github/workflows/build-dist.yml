@@ -34,7 +34,7 @@ jobs:
 
       - name: Commit and push dist
         run: |
-          git config user.name "sathishbot
+          git config user.name "sathishbot"
           git config user.email "sathishkrcs@gmail.com"
           git add dist/
           # Only commit if there are changes

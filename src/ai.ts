@@ -15,7 +15,6 @@ export interface AISuggestion {
   confidence: 'high' | 'medium' | 'low'
 }
 
-// Call GitHub Models API using the existing GITHUB_TOKEN — no extra API key needed
 export async function getAISuggestion(
   errorLines: string[],
   token: string
@@ -23,7 +22,6 @@ export async function getAISuggestion(
   try {
     core.info('🤖 No pattern matched — calling GitHub Models AI for analysis...')
 
-    // Truncate logs to avoid token limits — send top 50 error lines only
     const logSample = errorLines.slice(0, 50).join('\n')
 
     const prompt = `You are a CI/CD pipeline expert. Analyze the following pipeline failure log lines and provide:
@@ -52,17 +50,12 @@ ${logSample}
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini', // fast, cheap, good enough for log analysis
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+        model: 'openai/gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
         max_tokens: 300,
-        temperature: 0.2 // low temp for consistent, factual responses
+        temperature: 0.2
       }),
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(10000)
     })
 
     if (!response.ok) {
@@ -71,7 +64,8 @@ ${logSample}
       return null
     }
 
-    const data: GitHubModelsResponse = await response.json()
+    // Cast to unknown first, then to our interface — fixes TS2322
+    const data = await response.json() as unknown as GitHubModelsResponse
     const content = data.choices?.[0]?.message?.content?.trim()
 
     if (!content) {
@@ -79,15 +73,14 @@ ${logSample}
       return null
     }
 
-    // Strip markdown code fences if present
     const clean = content.replace(/```json|```/g, '').trim()
-    const parsed: AISuggestion = JSON.parse(clean)
+    const parsed = JSON.parse(clean) as AISuggestion
 
     core.info(`🤖 AI analysis complete — confidence: ${parsed.confidence}`)
     return parsed
 
   } catch (err) {
-    core.warning(`⚠️ GitHub Models AI fallback failed (using static fallback): ${err}`)
+    core.warning(`⚠️ GitHub Models AI fallback failed: ${err}`)
     return null
   }
 }

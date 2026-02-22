@@ -11,7 +11,7 @@ export interface FailureAnalysis {
   severity: 'critical' | 'warning' | 'info'
   matchedPattern: string
   category: string
-  aiGenerated: boolean  // flag so users know if the suggestion came from AI
+  aiGenerated: boolean
 }
 
 interface ErrorPattern {
@@ -30,13 +30,13 @@ interface PatternsFile {
   patterns: ErrorPattern[]
 }
 
-// Load patterns from local patterns.json
 function loadLocalPatterns(): ErrorPattern[] {
   const localPath = path.join(__dirname, '..', 'patterns.json')
   try {
     if (fs.existsSync(localPath)) {
       const raw = fs.readFileSync(localPath, 'utf-8')
-      const parsed: PatternsFile = JSON.parse(raw)
+      // Cast to unknown first, then to our interface — fixes TS2322
+      const parsed = JSON.parse(raw) as unknown as PatternsFile
       core.info(`✅ Loaded ${parsed.patterns.length} patterns from patterns.json (v${parsed.version})`)
       return parsed.patterns
     }
@@ -46,7 +46,6 @@ function loadLocalPatterns(): ErrorPattern[] {
   return []
 }
 
-// Fetch patterns from remote community URL
 async function fetchRemotePatterns(remoteUrl: string): Promise<ErrorPattern[]> {
   try {
     core.info(`🌐 Fetching remote patterns from ${remoteUrl}...`)
@@ -58,7 +57,8 @@ async function fetchRemotePatterns(remoteUrl: string): Promise<ErrorPattern[]> {
       core.warning(`⚠️ Remote patterns fetch failed: HTTP ${response.status}`)
       return []
     }
-    const parsed: PatternsFile = await response.json()
+    // Cast to unknown first, then to our interface — fixes TS2322
+    const parsed = await response.json() as unknown as PatternsFile
     core.info(`✅ Loaded ${parsed.patterns.length} remote patterns (v${parsed.version})`)
     return parsed.patterns
   } catch (err) {
@@ -67,7 +67,6 @@ async function fetchRemotePatterns(remoteUrl: string): Promise<ErrorPattern[]> {
   }
 }
 
-// Merge — local always wins
 function mergePatterns(local: ErrorPattern[], remote: ErrorPattern[]): ErrorPattern[] {
   const localIds = new Set(local.map(p => p.id))
   const remoteOnly = remote.filter(p => !localIds.has(p.id))
@@ -93,7 +92,6 @@ function extractFailedStep(lines: string[]): string | null {
   return null
 }
 
-// Main analysis function — pattern match first, AI fallback if no match
 export async function analyzeLogs(
   logs: string,
   patterns: ErrorPattern[],
@@ -110,7 +108,7 @@ export async function analyzeLogs(
     }
   }
 
-  // Step 1 — try pattern matching first (fast, free, no API call)
+  // Tier 1 — pattern matching
   for (const p of patterns) {
     const regex = new RegExp(p.pattern, p.flags)
     for (const line of errorLines) {
@@ -130,7 +128,7 @@ export async function analyzeLogs(
     }
   }
 
-  // Step 2 — no pattern matched, try AI fallback via GitHub Models
+  // Tier 2 — GitHub Models AI fallback
   if (useAI && errorLines.length > 0) {
     core.info('⚠️ No pattern matched — trying GitHub Models AI fallback...')
     const aiResult = await getAISuggestion(errorLines, token)
@@ -149,7 +147,7 @@ export async function analyzeLogs(
     }
   }
 
-  // Step 3 — complete fallback if AI also fails or is disabled
+  // Tier 3 — generic fallback
   return {
     rootCause: 'Unknown failure — could not automatically detect root cause',
     failedStep: stepName || extractFailedStep(lines) || 'Unknown step',

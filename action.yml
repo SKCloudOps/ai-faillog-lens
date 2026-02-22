@@ -1,6 +1,6 @@
-name: 'PipelineLens'
-description: 'Instant pipeline failure analysis — pattern matching + AI fallback via GitHub Models'
-author: 'PipelineLens'
+name: 'AI FaillogLens'
+description: 'AI that zooms into your failure logs and tells you exactly what broke'
+author: 'Sathish'
 
 branding:
   icon: 'search'

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "PipelineLens error patterns — community maintained. Add your own patterns here!",
+  "description": "AI FaillogLens error patterns — community maintained. Add your own patterns here!",
   "patterns": [
     {
       "id": "docker-auth",

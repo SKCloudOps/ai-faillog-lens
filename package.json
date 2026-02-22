@@ -1,5 +1,5 @@
 {
-  "name": "pipeline-lens",
+  "name": "ai-faillog-lens",
   "version": "1.0.0",
   "description": "Instant pipeline failure analysis — no more digging through 500 lines of logs",
   "main": "dist/index.js",

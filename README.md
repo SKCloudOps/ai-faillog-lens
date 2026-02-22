@@ -1,4 +1,4 @@
-# 🔍 PipelineLens
+# 🔍 AI FaillogLens
 
 > Instant CI/CD pipeline failure analysis — no more digging through 500 lines of logs.
 
@@ -26,7 +26,7 @@ analyze-failure:
     models: read            # GitHub Models AI (for unknown errors)
 
   steps:
-    - uses: your-username/pipeline-lens@main
+    - uses: sathishkpr/ai-faillog-lens@v1
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
 ```

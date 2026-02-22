@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. v1.0.1)'
+        required: true
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Bug fixes and improvements'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build dist
+        run: npm run build
+
+      - name: Commit dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          if git diff --staged --quiet; then
+            echo "No changes to dist/"
+          else
+            git commit -m "build: update dist for ${{ github.event.inputs.version }} [skip ci]"
+            git push
+          fi
+
+      - name: Create and push version tag
+        run: |
+          git tag -a ${{ github.event.inputs.version }} -m "${{ github.event.inputs.version }} Release"
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Move major version tag (e.g. v1)
+        run: |
+          MAJOR_TAG=$(echo "${{ github.event.inputs.version }}" | cut -d. -f1)
+          git tag -fa $MAJOR_TAG -m "Update $MAJOR_TAG to ${{ github.event.inputs.version }}"
+          git push origin $MAJOR_TAG --force
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ github.event.inputs.version }}',
+              name: '${{ github.event.inputs.version }} — AI FaillogLens',
+              body: `## AI FaillogLens ${{ github.event.inputs.version }}
+
+            ${{ github.event.inputs.release_notes }}
+
+            ### Quick Start
+            \`\`\`yaml
+            - uses: SKCloudOps/ai-faillog-lens@${{ github.event.inputs.version }}
+              with:
+                github-token: \${{ secrets.GITHUB_TOKEN }}
+            \`\`\`
+
+            ### What It Does
+            - 🔍 Pattern-based error detection for Docker, GitHub Actions, Node.js, Kubernetes
+            - 🤖 AI-powered fallback via GitHub Models — no extra API key needed
+            - 💬 Posts plain-English root cause and fix suggestion directly on your PR`,
+              draft: false,
+              prerelease: false
+            })

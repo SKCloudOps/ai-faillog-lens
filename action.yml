@@ -1,0 +1,37 @@
+name: 'PipelineLens'
+description: 'Instant pipeline failure analysis — automatically detects root cause and posts fix suggestions on your PR'
+author: 'PipelineLens'
+
+branding:
+  icon: 'search'
+  color: 'red'
+
+inputs:
+  github-token:
+    description: 'GitHub token for posting PR comments'
+    required: true
+    default: ${{ github.token }}
+  post-comment:
+    description: 'Post analysis as a PR comment'
+    required: false
+    default: 'true'
+  post-summary:
+    description: 'Post analysis as a job summary'
+    required: false
+    default: 'true'
+  failed-job-name:
+    description: 'Name of the failed job to analyze (optional, analyzes all if not set)'
+    required: false
+    default: ''
+
+outputs:
+  root-cause:
+    description: 'Plain-english root cause of the failure'
+  failed-step:
+    description: 'The step that caused the failure'
+  suggestion:
+    description: 'Suggested fix for the failure'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

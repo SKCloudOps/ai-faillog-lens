@@ -1,0 +1,6 @@
+node_modules/
+*.js.map
+*.d.ts
+
+# Don't ignore dist — it must be committed for the action to work
+!dist/

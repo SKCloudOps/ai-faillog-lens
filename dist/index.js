@@ -29922,163 +29922,205 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 8561:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ 2382:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.analyzeLogs = analyzeLogs;
-// Known error patterns with plain-English explanations and fix suggestions
-const ERROR_PATTERNS = [
-    // Docker errors
-    {
-        pattern: /unauthorized.*registry|denied.*requested access|authentication required/i,
-        rootCause: 'Docker registry authentication failed',
-        suggestion: 'Check your `DOCKER_USERNAME` and `DOCKER_PASSWORD` secrets are set correctly in repository settings (Settings → Secrets → Actions)',
-        severity: 'critical'
-    },
-    {
-        pattern: /manifest.*not found|pull access denied|repository does not exist/i,
-        rootCause: 'Docker image or tag not found in registry',
-        suggestion: 'Verify the image name and tag exist in your registry. Check for typos in your image reference.',
-        severity: 'critical'
-    },
-    {
-        pattern: /no space left on device/i,
-        rootCause: 'Runner ran out of disk space',
-        suggestion: 'Add a disk cleanup step before your build: use `docker system prune -f` or the `jlumbroso/free-disk-space` action.',
-        severity: 'critical'
-    },
-    {
-        pattern: /dockerfile.*not found|cannot find.*dockerfile/i,
-        rootCause: 'Dockerfile not found at specified path',
-        suggestion: 'Check the `file` or `context` path in your docker build step. Make sure the Dockerfile exists at that location.',
-        severity: 'critical'
-    },
-    // GitHub Actions errors
-    {
-        pattern: /secret.*not.*set|secrets\.(\w+).*undefined|Input required and not supplied/i,
-        rootCause: 'A required secret or input is missing',
-        suggestion: 'Go to Settings → Secrets → Actions and add the missing secret. Check the action\'s documentation for required inputs.',
-        severity: 'critical'
-    },
-    {
-        pattern: /resource not accessible by integration|403.*github/i,
-        rootCause: 'GitHub token lacks required permissions',
-        suggestion: 'Add the required permissions to your workflow. Example: `permissions: contents: write` or use a Personal Access Token with broader scopes.',
-        severity: 'critical'
-    },
-    {
-        pattern: /timeout|timed out after/i,
-        rootCause: 'A step exceeded its timeout limit',
-        suggestion: 'Increase the `timeout-minutes` for the step or job. Consider caching dependencies to speed up the pipeline.',
-        severity: 'warning'
-    },
-    // Node.js / npm errors
-    {
-        pattern: /npm ERR!.*peer dep|ERESOLVE/i,
-        rootCause: 'npm dependency conflict detected',
-        suggestion: 'Try adding `--legacy-peer-deps` flag to your npm install command, or update conflicting packages.',
-        severity: 'critical'
-    },
-    {
-        pattern: /cannot find module|module not found/i,
-        rootCause: 'A required Node.js module is missing',
-        suggestion: 'Run `npm install` before your build step, or check that all dependencies are listed in `package.json`.',
-        severity: 'critical'
-    },
-    {
-        pattern: /EACCES.*permission denied|EPERM/i,
-        rootCause: 'File permission error during npm install',
-        suggestion: 'Avoid running npm with sudo. Check if you need to set `NODE_PATH` or use a specific Node.js version via `actions/setup-node`.',
-        severity: 'critical'
-    },
-    // Test failures
-    {
-        pattern: /(\d+) (test|spec|suite)s? failed|FAIL.*\.test\.|Tests Failed/i,
-        rootCause: 'One or more tests failed',
-        suggestion: 'Check the test output above for specific failing test names. Run the tests locally with the same environment variables to reproduce.',
-        severity: 'critical'
-    },
-    // Build errors
-    {
-        pattern: /TypeScript.*error|TS\d{4}:/i,
-        rootCause: 'TypeScript compilation error',
-        suggestion: 'Fix the TypeScript errors shown above. Run `tsc --noEmit` locally to see all errors before pushing.',
-        severity: 'critical'
-    },
-    {
-        pattern: /syntax error|SyntaxError/i,
-        rootCause: 'Syntax error in code',
-        suggestion: 'Check the file and line number shown above for syntax errors. Run a linter locally to catch these before pushing.',
-        severity: 'critical'
-    },
-    // Network errors
-    {
-        pattern: /connection refused|ECONNREFUSED|network.*unreachable/i,
-        rootCause: 'Network connection failed',
-        suggestion: 'Check if the target service is running and accessible. For external services, verify the URL and port. Consider adding retry logic.',
-        severity: 'critical'
-    },
-    {
-        pattern: /rate limit.*exceeded|API rate limit/i,
-        rootCause: 'API rate limit exceeded',
-        suggestion: 'You\'ve hit GitHub\'s API rate limit. Use `GITHUB_TOKEN` for authenticated requests (higher limits) or add delays between API calls.',
-        severity: 'warning'
-    },
-    // Kubernetes / Helm
-    {
-        pattern: /imagepullbackoff|errimagepull/i,
-        rootCause: 'Kubernetes cannot pull the Docker image',
-        suggestion: 'Check the image name and tag. If using a private registry, ensure the imagePullSecret is configured correctly in your cluster.',
-        severity: 'critical'
-    },
-    {
-        pattern: /helm.*failed|Error: UPGRADE FAILED/i,
-        rootCause: 'Helm chart deployment failed',
-        suggestion: 'Run `helm status <release-name>` and `kubectl describe pod` to get more details. Check if there are resource conflicts.',
-        severity: 'critical'
-    },
-    // Generic fallback
-    {
-        pattern: /error|failed|fatal/i,
-        rootCause: 'An error occurred during pipeline execution',
-        suggestion: 'Review the highlighted error lines above for details. Check the step\'s documentation for common issues.',
-        severity: 'warning'
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
     }
-];
-function analyzeLogs(logs, stepName) {
-    const lines = logs.split('\n');
-    const errorLines = [];
-    // Collect lines that look like errors
-    for (const line of lines) {
-        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(line) && line.trim().length > 0) {
-            errorLines.push(line.trim());
-        }
-    }
-    // Try to match against known patterns
-    for (const { pattern, rootCause, suggestion, severity } of ERROR_PATTERNS) {
-        for (const line of errorLines) {
-            if (pattern.test(line)) {
-                return {
-                    rootCause,
-                    failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
-                    suggestion,
-                    errorLines: errorLines.slice(0, 10), // top 10 error lines
-                    severity
-                };
-            }
-        }
-    }
-    // Fallback — couldn't match a known pattern
-    return {
-        rootCause: 'Unknown failure — could not automatically detect root cause',
-        failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
-        suggestion: 'Review the error lines below carefully. Check the step\'s logs for more context.',
-        errorLines: errorLines.slice(0, 10),
-        severity: 'warning'
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
     };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getAISuggestion = getAISuggestion;
+const core = __importStar(__nccwpck_require__(7484));
+async function getAISuggestion(errorLines, token) {
+    try {
+        core.info('🤖 No pattern matched — calling GitHub Models AI for analysis...');
+        const logSample = errorLines.slice(0, 50).join('\n');
+        const prompt = `You are a CI/CD pipeline expert. Analyze the following pipeline failure log lines and provide:
+1. A plain-English root cause (1 sentence, no jargon)
+2. A specific, actionable fix suggestion (2-3 sentences max)
+3. A confidence level: high, medium, or low
+
+Respond ONLY in this JSON format, nothing else:
+{
+  "rootCause": "...",
+  "suggestion": "...",
+  "confidence": "high|medium|low"
+}
+
+Pipeline failure log:
+\`\`\`
+${logSample}
+\`\`\``;
+        const response = await fetch('https://models.github.ai/inference/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'openai/gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 300,
+                temperature: 0.2
+            }),
+            signal: AbortSignal.timeout(10000)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            core.warning(`⚠️ GitHub Models API returned ${response.status}: ${errorText}`);
+            return null;
+        }
+        // Cast to unknown first, then to our interface — fixes TS2322
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (!content) {
+            core.warning('⚠️ GitHub Models returned empty response');
+            return null;
+        }
+        const clean = content.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        core.info(`🤖 AI analysis complete — confidence: ${parsed.confidence}`);
+        return parsed;
+    }
+    catch (err) {
+        core.warning(`⚠️ GitHub Models AI fallback failed: ${err}`);
+        return null;
+    }
+}
+
+
+/***/ }),
+
+/***/ 8561:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.loadPatterns = loadPatterns;
+exports.analyzeLogs = analyzeLogs;
+const fs = __importStar(__nccwpck_require__(9896));
+const path = __importStar(__nccwpck_require__(6928));
+const core = __importStar(__nccwpck_require__(7484));
+const ai_1 = __nccwpck_require__(2382);
+function loadLocalPatterns() {
+    const localPath = path.join(__dirname, '..', 'patterns.json');
+    try {
+        if (fs.existsSync(localPath)) {
+            const raw = fs.readFileSync(localPath, 'utf-8');
+            // Cast to unknown first, then to our interface — fixes TS2322
+            const parsed = JSON.parse(raw);
+            core.info(`✅ Loaded ${parsed.patterns.length} patterns from patterns.json (v${parsed.version})`);
+            return parsed.patterns;
+        }
+    }
+    catch (err) {
+        core.warning(`⚠️ Could not load local patterns.json: ${err}`);
+    }
+    return [];
+}
+async function fetchRemotePatterns(remoteUrl) {
+    try {
+        core.info(`🌐 Fetching remote patterns from ${remoteUrl}...`);
+        const response = await fetch(remoteUrl, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(5000)
+        });
+        if (!response.ok) {
+            core.warning(`⚠️ Remote patterns fetch failed: HTTP ${response.status}`);
+            return [];
+        }
+        // Cast to unknown first, then to our interface — fixes TS2322
+        const parsed = await response.json();
+        core.info(`✅ Loaded ${parsed.patterns.length} remote patterns (v${parsed.version})`);
+        return parsed.patterns;
+    }
+    catch (err) {
+        core.warning(`⚠️ Could not fetch remote patterns: ${err}`);
+        return [];
+    }
+}
+function mergePatterns(local, remote) {
+    const localIds = new Set(local.map(p => p.id));
+    const remoteOnly = remote.filter(p => !localIds.has(p.id));
+    const merged = [...local, ...remoteOnly];
+    core.info(`📋 Using ${merged.length} total patterns (${local.length} local + ${remoteOnly.length} remote)`);
+    return merged;
+}
+async function loadPatterns(remoteUrl) {
+    const local = loadLocalPatterns();
+    if (remoteUrl) {
+        const remote = await fetchRemotePatterns(remoteUrl);
+        return mergePatterns(local, remote);
+    }
+    return local;
 }
 function extractFailedStep(lines) {
     for (const line of lines) {
@@ -30087,6 +30129,62 @@ function extractFailedStep(lines) {
             return match[1] || match[2];
     }
     return null;
+}
+async function analyzeLogs(logs, patterns, token, useAI, stepName) {
+    const lines = logs.split('\n');
+    const errorLines = [];
+    for (const line of lines) {
+        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(line) && line.trim().length > 0) {
+            errorLines.push(line.trim());
+        }
+    }
+    // Tier 1 — pattern matching
+    for (const p of patterns) {
+        const regex = new RegExp(p.pattern, p.flags);
+        for (const line of errorLines) {
+            if (regex.test(line)) {
+                core.info(`✅ Matched pattern: ${p.id} (${p.category})`);
+                return {
+                    rootCause: p.rootCause,
+                    failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                    suggestion: p.suggestion,
+                    errorLines,
+                    severity: p.severity,
+                    matchedPattern: p.id,
+                    category: p.category,
+                    aiGenerated: false
+                };
+            }
+        }
+    }
+    // Tier 2 — GitHub Models AI fallback
+    if (useAI && errorLines.length > 0) {
+        core.info('⚠️ No pattern matched — trying GitHub Models AI fallback...');
+        const aiResult = await (0, ai_1.getAISuggestion)(errorLines, token);
+        if (aiResult) {
+            return {
+                rootCause: aiResult.rootCause,
+                failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                suggestion: `${aiResult.suggestion} *(AI-generated, confidence: ${aiResult.confidence})*`,
+                errorLines,
+                severity: 'warning',
+                matchedPattern: 'ai-generated',
+                category: 'AI Analysis',
+                aiGenerated: true
+            };
+        }
+    }
+    // Tier 3 — generic fallback
+    return {
+        rootCause: 'Unknown failure — could not automatically detect root cause',
+        failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+        suggestion: 'Review the error lines below. Consider adding a custom pattern to patterns.json to handle this error in future runs.',
+        errorLines,
+        severity: 'warning',
+        matchedPattern: 'none',
+        category: 'Unknown',
+        aiGenerated: false
+    };
 }
 
 
@@ -30266,24 +30364,24 @@ async function run() {
         const postComment = core.getInput('post-comment') === 'true';
         const postSummary = core.getInput('post-summary') === 'true';
         const failedJobName = core.getInput('failed-job-name');
+        const remotePatternsUrl = core.getInput('remote-patterns-url');
+        const enableAI = core.getInput('enable-ai') === 'true';
         const octokit = github.getOctokit(token);
         const context = github.context;
         const { owner, repo } = context.repo;
         core.info('🔍 PipelineLens: Starting failure analysis...');
+        core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`);
+        // Load patterns — local + optional remote
+        const patterns = await (0, analyzer_1.loadPatterns)(remotePatternsUrl || undefined);
         const runId = context.runId;
         const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
-        // Context info for job summary
         const branch = context.ref.replace('refs/heads/', '');
         const commit = context.sha;
         const triggeredBy = context.actor;
         const repoFullName = `${owner}/${repo}`;
-        // Fetch jobs for this run
         const { data: jobsData } = await octokit.rest.actions.listJobsForWorkflowRun({
-            owner,
-            repo,
-            run_id: runId
+            owner, repo, run_id: runId
         });
-        // Find failed jobs
         const failedJobs = jobsData.jobs.filter(job => {
             const isFailed = job.conclusion === 'failure';
             if (failedJobName)
@@ -30297,13 +30395,10 @@ async function run() {
         core.info(`Found ${failedJobs.length} failed job(s). Analyzing...`);
         for (const job of failedJobs) {
             core.info(`📋 Analyzing job: ${job.name}`);
-            // Fetch logs
             let logs = '';
             try {
                 const logsResponse = await octokit.rest.actions.downloadJobLogsForWorkflowRun({
-                    owner,
-                    repo,
-                    job_id: job.id
+                    owner, repo, job_id: job.id
                 });
                 logs = logsResponse.data;
             }
@@ -30315,45 +30410,43 @@ async function run() {
                     .join('\n') || '';
             }
             const failedStep = job.steps?.find(s => s.conclusion === 'failure')?.name;
-            const analysis = (0, analyzer_1.analyzeLogs)(logs, failedStep);
+            // Analyze — pattern match first, AI fallback if enabled and no match
+            const analysis = await (0, analyzer_1.analyzeLogs)(logs, patterns, token, enableAI, failedStep);
             core.info(`🔍 Root cause: ${analysis.rootCause}`);
-            core.info(`💡 Suggestion: ${analysis.suggestion}`);
+            core.info(`📦 Category: ${analysis.category}`);
+            core.info(`🎯 Matched pattern: ${analysis.matchedPattern}`);
+            core.info(`🤖 AI generated: ${analysis.aiGenerated}`);
             // Set outputs
             core.setOutput('root-cause', analysis.rootCause);
             core.setOutput('failed-step', analysis.failedStep);
             core.setOutput('suggestion', analysis.suggestion);
-            // Post rich job summary
+            core.setOutput('matched-pattern', analysis.matchedPattern);
+            core.setOutput('category', analysis.category);
+            core.setOutput('ai-generated', String(analysis.aiGenerated));
+            // Post job summary
             if (postSummary) {
                 const summary = (0, formatter_1.formatJobSummary)(analysis, job.name, runUrl, job.steps ?? [], triggeredBy, branch, commit, repoFullName);
                 await core.summary.addRaw(summary).write();
                 core.info('📊 Job summary posted.');
             }
-            // Post PR comment if this is a pull request
+            // Post PR comment
             if (postComment && context.payload.pull_request) {
                 const prNumber = context.payload.pull_request.number;
                 const comment = (0, formatter_1.formatPRComment)(analysis, job.name, runUrl);
                 const { data: comments } = await octokit.rest.issues.listComments({
-                    owner,
-                    repo,
-                    issue_number: prNumber
+                    owner, repo, issue_number: prNumber
                 });
                 const existingComment = comments.find(c => c.body?.includes('PipelineLens — Failure Analysis') &&
                     c.body?.includes(job.name));
                 if (existingComment) {
                     await octokit.rest.issues.updateComment({
-                        owner,
-                        repo,
-                        comment_id: existingComment.id,
-                        body: comment
+                        owner, repo, comment_id: existingComment.id, body: comment
                     });
                     core.info('💬 Updated existing PR comment.');
                 }
                 else {
                     await octokit.rest.issues.createComment({
-                        owner,
-                        repo,
-                        issue_number: prNumber,
-                        body: comment
+                        owner, repo, issue_number: prNumber, body: comment
                     });
                     core.info('💬 Posted PR comment.');
                 }

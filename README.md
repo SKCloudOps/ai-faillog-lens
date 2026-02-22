@@ -26,7 +26,7 @@ analyze-failure:
     models: read            # GitHub Models AI (for unknown errors)
 
   steps:
-    - uses: sathishkpr/ai-faillog-lens@v1
+    - uses: SKCloudOps/ai-faillog-lens@v1
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
 ```

@@ -1,6 +1,7 @@
 name: Build & Commit dist
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -34,8 +35,8 @@ jobs:
 
       - name: Commit and push dist
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "sathishbot
+          git config user.email "sathishkrcs@gmail.com"
           git add dist/
           # Only commit if there are changes
           if git diff --staged --quiet; then

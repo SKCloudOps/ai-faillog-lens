@@ -18,7 +18,7 @@ function formatPRComment(analysis, jobName, runUrl) {
     const errorBlock = analysis.errorLines.length > 0
         ? `\n<details>\n<summary>📋 Error lines detected (${analysis.errorLines.length})</summary>\n\n\`\`\`\n${analysis.errorLines.join('\n')}\n\`\`\`\n</details>`
         : '';
-    return `## ${emoji} PipelineLens — Failure Analysis
+    return `## ${emoji} AIFailLogLens — Failure Analysis
 
 > **Job:** \`${jobName}\` · **Severity:** ${label} · [View full logs](${runUrl})
 
@@ -35,7 +35,7 @@ ${analysis.suggestion}
 ${errorBlock}
 
 ---
-<sub>🔬 Analyzed by [PipelineLens](https://github.com/your-username/pipeline-lens) · [Report false positive](https://github.com/your-username/pipeline-lens/issues)</sub>`;
+<sub>🔬 Analyzed by [AIFailLogLens](https://github.com/your-username/pipeline-lens) · [Report false positive](https://github.com/your-username/pipeline-lens/issues)</sub>`;
 }
 function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch, commit, repo) {
     const emoji = SEVERITY_EMOJI[analysis.severity];
@@ -56,7 +56,7 @@ function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch,
     const allErrorLines = analysis.errorLines.length > 0
         ? analysis.errorLines.join('\n')
         : 'No error lines captured';
-    return `# ${emoji} PipelineLens — Failure Report
+    return `# ${emoji} AIFailLogLens — Failure Report
 
 > ${emoji} **Severity:** ${label} &nbsp;|&nbsp; 📋 **Job:** \`${jobName}\` &nbsp;|&nbsp; 🕐 **Time:** ${now}
 
@@ -110,8 +110,8 @@ ${allErrorLines}
 
 - 🔗 [View full workflow run](${runUrl})
 - 🐛 [Report a false positive](https://github.com/your-username/pipeline-lens/issues)
-- 📖 [PipelineLens documentation](https://github.com/your-username/pipeline-lens#readme)
+- 📖 [AIFailLogLens documentation](https://github.com/your-username/pipeline-lens#readme)
 
 ---
-<sub>🔬 Analyzed by PipelineLens · ${now}</sub>`;
+<sub>🔬 Analyzed by AIFailLogLens · ${now}</sub>`;
 }

@@ -1,176 +1,1093 @@
 {
-  "version": "1.0.0",
-  "description": "AI FaillogLens error patterns — community maintained. Add your own patterns here!",
+  "version": "1.2.0",
+  "description": "AI FaillogLens — universal build error patterns. Community maintained.",
+  "settings": {
+    "matchStrategy": "first",
+    "categoryPriority": [
+      "Security",
+      "Android / Gradle",
+      "Java / Maven",
+      "iOS / Xcode",
+      "Docker",
+      "Kubernetes",
+      "Ansible",
+      "Terraform",
+      "Node.js",
+      "Python",
+      "Go",
+      "Rust",
+      "GitHub Actions",
+      "Tests",
+      "Build",
+      "Network",
+      "Runner",
+      "General"
+    ]
+  },
   "patterns": [
     {
       "id": "docker-auth",
       "category": "Docker",
-      "pattern": "unauthorized.*registry|denied.*requested access|authentication required",
+      "priority": 90,
+      "pattern": "unauthorized.*incorrect username|incorrect username or password|unauthorized.*registry|denied.*requested access|authentication required",
       "flags": "i",
-      "rootCause": "Docker registry authentication failed",
-      "suggestion": "Check your DOCKER_USERNAME and DOCKER_PASSWORD secrets are set correctly in repository settings (Settings → Secrets → Actions)",
+      "rootCause": "Docker registry authentication failed — incorrect username or password",
+      "suggestion": "Check your DOCKER_USERNAME and DOCKER_PASSWORD secrets in Settings → Secrets → Actions. Make sure they are not expired.",
       "severity": "critical",
-      "tags": ["docker", "auth", "registry"]
+      "tags": [
+        "docker",
+        "auth",
+        "registry"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error response from daemon: unauthorized: incorrect username or password",
+          "unauthorized: authentication required",
+          "denied: requested access to the resource is denied"
+        ],
+        "shouldNotMatch": [
+          "Build completed successfully",
+          "npm install completed",
+          "All tests passed"
+        ]
+      }
     },
     {
       "id": "docker-image-not-found",
       "category": "Docker",
+      "priority": 85,
       "pattern": "manifest.*not found|pull access denied|repository does not exist",
       "flags": "i",
       "rootCause": "Docker image or tag not found in registry",
       "suggestion": "Verify the image name and tag exist in your registry. Check for typos in your image reference.",
       "severity": "critical",
-      "tags": ["docker", "image", "registry"]
+      "tags": [
+        "docker",
+        "image",
+        "registry"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "manifest for myapp:latest not found",
+          "pull access denied for myrepo/myimage",
+          "repository does not exist or may require 'docker login'"
+        ],
+        "shouldNotMatch": [
+          "docker build completed",
+          "image pushed successfully"
+        ]
+      }
     },
     {
       "id": "docker-no-space",
       "category": "Docker",
+      "priority": 80,
       "pattern": "no space left on device",
       "flags": "i",
-      "rootCause": "Runner ran out of disk space",
-      "suggestion": "Add a disk cleanup step before your build: use 'docker system prune -f' or the 'jlumbroso/free-disk-space' action.",
+      "rootCause": "Runner ran out of disk space during Docker build",
+      "suggestion": "Add 'docker system prune -f' before your build step or use the 'jlumbroso/free-disk-space' action to free up disk space.",
       "severity": "critical",
-      "tags": ["docker", "disk", "runner"]
+      "tags": [
+        "docker",
+        "disk",
+        "runner"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "no space left on device",
+          "ERROR: failed to solve: no space left on device"
+        ],
+        "shouldNotMatch": [
+          "disk usage: 45%",
+          "sufficient space available"
+        ]
+      }
     },
     {
       "id": "docker-dockerfile-not-found",
       "category": "Docker",
+      "priority": 75,
       "pattern": "dockerfile.*not found|cannot find.*dockerfile",
       "flags": "i",
-      "rootCause": "Dockerfile not found at specified path",
-      "suggestion": "Check the 'file' or 'context' path in your docker build step. Make sure the Dockerfile exists at that location.",
+      "rootCause": "Dockerfile not found at the specified path",
+      "suggestion": "Check the 'file' or 'context' path in your docker build step. Ensure the Dockerfile exists at that location.",
       "severity": "critical",
-      "tags": ["docker", "dockerfile"]
+      "tags": [
+        "docker",
+        "dockerfile"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "dockerfile not found at path ./docker/Dockerfile",
+          "cannot find dockerfile in current directory"
+        ],
+        "shouldNotMatch": [
+          "dockerfile found",
+          "building from dockerfile"
+        ]
+      }
     },
     {
-      "id": "gha-missing-secret",
-      "category": "GitHub Actions",
-      "pattern": "secret.*not.*set|Input required and not supplied",
+      "id": "docker-daemon",
+      "category": "Docker",
+      "priority": 70,
+      "pattern": "cannot connect to the docker daemon|is the docker daemon running|docker daemon is not running",
       "flags": "i",
-      "rootCause": "A required secret or input is missing",
-      "suggestion": "Go to Settings → Secrets → Actions and add the missing secret. Check the action's documentation for required inputs.",
+      "rootCause": "Docker daemon is not running on the runner",
+      "suggestion": "Use 'runs-on: ubuntu-latest' which includes Docker pre-installed. Avoid Docker-in-Docker unless absolutely necessary.",
       "severity": "critical",
-      "tags": ["actions", "secret", "input"]
+      "tags": [
+        "docker",
+        "daemon",
+        "runner"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Cannot connect to the Docker daemon at unix:///var/run/docker.sock",
+          "Is the docker daemon running?",
+          "docker daemon is not running"
+        ],
+        "shouldNotMatch": [
+          "docker daemon started",
+          "docker is running"
+        ]
+      }
     },
     {
-      "id": "gha-permission",
-      "category": "GitHub Actions",
-      "pattern": "resource not accessible by integration|403.*github",
+      "id": "gradle-build-failed",
+      "category": "Android / Gradle",
+      "priority": 92,
+      "pattern": "BUILD FAILED|execution failed for task|Gradle build daemon disappeared",
       "flags": "i",
-      "rootCause": "GitHub token lacks required permissions",
-      "suggestion": "Add the required permissions to your workflow. Example: 'permissions: contents: write' or use a Personal Access Token with broader scopes.",
+      "rootCause": "Gradle build failed",
+      "suggestion": "Check the task that failed above. Run './gradlew build --stacktrace' locally for a full error trace.",
       "severity": "critical",
-      "tags": ["actions", "permissions", "token"]
+      "tags": [
+        "gradle",
+        "android",
+        "build"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "BUILD FAILED in 2m 30s",
+          "Execution failed for task ':app:compileDebugJava'",
+          "Gradle build daemon disappeared unexpectedly"
+        ],
+        "shouldNotMatch": [
+          "BUILD SUCCESSFUL",
+          "Gradle build completed"
+        ]
+      }
     },
     {
-      "id": "gha-timeout",
-      "category": "GitHub Actions",
-      "pattern": "timeout|timed out after",
+      "id": "android-sdk-missing",
+      "category": "Android / Gradle",
+      "priority": 85,
+      "pattern": "SDK location not found|failed to find target|android.sdk|ANDROID_HOME.*not set",
       "flags": "i",
-      "rootCause": "A step exceeded its timeout limit",
-      "suggestion": "Increase the 'timeout-minutes' for the step or job. Consider caching dependencies to speed up the pipeline.",
-      "severity": "warning",
-      "tags": ["actions", "timeout"]
+      "rootCause": "Android SDK not found on the runner",
+      "suggestion": "Add 'uses: android-actions/setup-android' to your workflow before the build step. Ensure ANDROID_HOME is set correctly.",
+      "severity": "critical",
+      "tags": [
+        "android",
+        "sdk"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "SDK location not found. Define location with sdk.dir in the local.properties file",
+          "failed to find target with hash string 'android-33'",
+          "ANDROID_HOME is not set"
+        ],
+        "shouldNotMatch": [
+          "SDK configured successfully",
+          "SDK version: 33"
+        ]
+      }
+    },
+    {
+      "id": "android-sign-failed",
+      "category": "Android / Gradle",
+      "priority": 80,
+      "pattern": "signing.*failed|keystore.*not found|jarsigner.*error|key.*store.*exception",
+      "flags": "i",
+      "rootCause": "Android app signing failed — keystore not found or invalid credentials",
+      "suggestion": "Ensure your keystore is stored as a base64 secret. Decode it in the workflow and verify KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD secrets are all set.",
+      "severity": "critical",
+      "tags": [
+        "android",
+        "signing",
+        "keystore"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Keystore file not found for signing config",
+          "jarsigner error: java.lang.RuntimeException: keystore load failed",
+          "signing failed for release build"
+        ],
+        "shouldNotMatch": [
+          "signing successful",
+          "APK signed and verified"
+        ]
+      }
+    },
+    {
+      "id": "android-oom",
+      "category": "Android / Gradle",
+      "priority": 75,
+      "pattern": "OutOfMemoryError|GC overhead limit exceeded|Java heap space",
+      "flags": "i",
+      "rootCause": "Gradle ran out of memory during Android build",
+      "suggestion": "Increase JVM heap in gradle.properties: org.gradle.jvmargs=-Xmx4g -XX:MaxPermSize=512m. Consider using a larger runner.",
+      "severity": "critical",
+      "tags": [
+        "android",
+        "memory",
+        "gradle"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "java.lang.OutOfMemoryError: Java heap space",
+          "GC overhead limit exceeded",
+          "OutOfMemoryError: unable to create new native thread"
+        ],
+        "shouldNotMatch": [
+          "memory usage: 45%",
+          "heap size: 512m"
+        ]
+      }
+    },
+    {
+      "id": "maven-build-failed",
+      "category": "Java / Maven",
+      "priority": 90,
+      "pattern": "BUILD FAILURE|Failed to execute goal|mvn.*error|\\[ERROR\\].*BUILD",
+      "flags": "i",
+      "rootCause": "Maven build failed",
+      "suggestion": "Check the goal that failed above. Run 'mvn clean install -X' locally for detailed debug output.",
+      "severity": "critical",
+      "tags": [
+        "maven",
+        "java",
+        "build"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "[ERROR] BUILD FAILURE",
+          "Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin",
+          "[ERROR] BUILD FAILURE: maven build failed"
+        ],
+        "shouldNotMatch": [
+          "[INFO] BUILD SUCCESS",
+          "Maven build completed successfully"
+        ]
+      }
+    },
+    {
+      "id": "java-compile-error",
+      "category": "Java / Maven",
+      "priority": 85,
+      "pattern": "error: cannot find symbol|package.*does not exist|cannot access class|\\[ERROR\\].*\\.java:\\[",
+      "flags": "i",
+      "rootCause": "Java compilation error — missing class, symbol or package",
+      "suggestion": "Check your import statements and dependencies in pom.xml or build.gradle. Run a clean build locally to see all errors.",
+      "severity": "critical",
+      "tags": [
+        "java",
+        "compile",
+        "maven"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "error: cannot find symbol: class UserService",
+          "package com.example.utils does not exist",
+          "[ERROR] src/main/java/App.java:[42,15] cannot find symbol"
+        ],
+        "shouldNotMatch": [
+          "compilation successful",
+          "0 errors, 0 warnings"
+        ]
+      }
+    },
+    {
+      "id": "java-dependency-not-found",
+      "category": "Java / Maven",
+      "priority": 80,
+      "pattern": "Could not find artifact|Could not resolve|dependency.*not found|Artifact.*not found",
+      "flags": "i",
+      "rootCause": "Maven/Gradle dependency not found in repository",
+      "suggestion": "Check the artifact coordinates in pom.xml or build.gradle. Verify the repository is accessible and the version exists on Maven Central.",
+      "severity": "critical",
+      "tags": [
+        "java",
+        "dependency",
+        "maven"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Could not find artifact com.example:mylib:jar:1.0.0",
+          "Could not resolve com.example:mylib:1.0.0",
+          "Artifact org.example:lib:1.2.3 not found"
+        ],
+        "shouldNotMatch": [
+          "dependency resolved",
+          "all artifacts downloaded"
+        ]
+      }
+    },
+    {
+      "id": "ansible-host-unreachable",
+      "category": "Ansible",
+      "priority": 97,
+      "pattern": "unreachable.*true|UNREACHABLE|Failed to connect to the host|SSH.*connection refused|ssh.*no route to host",
+      "flags": "i",
+      "rootCause": "Ansible cannot reach the target host — SSH connection failed",
+      "suggestion": "Check SSH connectivity to the host. Verify inventory file has correct hostnames/IPs. Ensure SSH keys are correctly configured as secrets.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "ssh",
+        "unreachable"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "fatal: [webserver01]: UNREACHABLE! => {\"msg\": \"Failed to connect to the host via ssh\"}",
+          "SSH connection refused on port 22",
+          "ssh: no route to host 192.168.1.100"
+        ],
+        "shouldNotMatch": [
+          "ok: [webserver01]",
+          "SSH connection established"
+        ]
+      }
+    },
+    {
+      "id": "ansible-task-failed",
+      "category": "Ansible",
+      "priority": 90,
+      "pattern": "fatal:.*FAILED|PLAY RECAP.*failed=[1-9]|failed=([1-9]\\d*)",
+      "flags": "i",
+      "rootCause": "One or more Ansible tasks failed",
+      "suggestion": "Check the failed task output above for the specific error message. Re-run with '-vvv' flag for verbose output.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "task",
+        "failed"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "fatal: [webserver01]: FAILED! => {\"msg\": \"command not found\"}",
+          "webserver01 : ok=2 changed=0 unreachable=0 failed=1",
+          "PLAY RECAP - failed=2"
+        ],
+        "shouldNotMatch": [
+          "ok: [webserver01]",
+          "failed=0",
+          "PLAY RECAP - ok=5 failed=0"
+        ]
+      }
+    },
+    {
+      "id": "ansible-permission-denied",
+      "category": "Ansible",
+      "priority": 85,
+      "pattern": "Permission denied.*ansible|sudo.*password required|become.*failed|privilege escalation failed",
+      "flags": "i",
+      "rootCause": "Ansible privilege escalation failed — sudo permission denied on target host",
+      "suggestion": "Ensure the ansible user has passwordless sudo on the target host, or add ANSIBLE_BECOME_PASS as a secret and pass it via --extra-vars.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "sudo",
+        "privilege"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Permission denied, please try again. sudo: password required",
+          "become failed: privilege escalation failed",
+          "sudo: a password is required — ansible become failed"
+        ],
+        "shouldNotMatch": [
+          "become: yes",
+          "sudo access granted"
+        ]
+      }
+    },
+    {
+      "id": "ansible-module-not-found",
+      "category": "Ansible",
+      "priority": 80,
+      "pattern": "couldn't resolve module|ERROR! no action detected|collection.*not found|role.*not found",
+      "flags": "i",
+      "rootCause": "Ansible module, collection or role not found",
+      "suggestion": "Install required collections with 'ansible-galaxy collection install -r requirements.yml'. Check your requirements.yml file is committed to the repo.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "module",
+        "collection"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "ERROR! couldn't resolve module/action 'community.general.ufw'",
+          "ERROR! no action detected in task",
+          "collection community.docker not found"
+        ],
+        "shouldNotMatch": [
+          "module loaded successfully",
+          "collection installed"
+        ]
+      }
+    },
+    {
+      "id": "ansible-syntax-error",
+      "category": "Ansible",
+      "priority": 75,
+      "pattern": "ERROR! Syntax Error|yaml.scanner.ScannerError|Unexpected templating error|invalid.*yaml",
+      "flags": "i",
+      "rootCause": "Ansible playbook has a YAML syntax or Jinja2 templating error",
+      "suggestion": "Run 'ansible-playbook --syntax-check playbook.yml' locally. Check for YAML indentation issues or unclosed Jinja2 {{ }} templates.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "syntax",
+        "yaml"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "ERROR! Syntax Error while loading YAML",
+          "yaml.scanner.ScannerError: mapping values are not allowed here",
+          "Unexpected templating error in playbook.yml"
+        ],
+        "shouldNotMatch": [
+          "syntax check passed",
+          "YAML valid"
+        ]
+      }
+    },
+    {
+      "id": "ansible-variable-undefined",
+      "category": "Ansible",
+      "priority": 70,
+      "pattern": "AnsibleUndefinedVariable|.*is undefined|variable.*not defined",
+      "flags": "i",
+      "rootCause": "Ansible variable is undefined",
+      "suggestion": "Check that all required variables are defined in inventory, group_vars, or passed via -e. Use the default() filter: {{ my_var | default('fallback') }}.",
+      "severity": "critical",
+      "tags": [
+        "ansible",
+        "variable"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "AnsibleUndefinedVariable: 'db_password' is undefined",
+          "The task includes an option with an undefined variable: deploy_env is undefined",
+          "variable 'api_key' not defined"
+        ],
+        "shouldNotMatch": [
+          "variable defined",
+          "all variables resolved"
+        ]
+      }
+    },
+    {
+      "id": "terraform-init-failed",
+      "category": "Terraform",
+      "priority": 90,
+      "pattern": "terraform init.*failed|Error: Failed to install provider|Could not retrieve providers",
+      "flags": "i",
+      "rootCause": "Terraform init failed — provider installation error",
+      "suggestion": "Check provider versions in versions.tf. Run 'terraform init -upgrade' locally. Verify network access to registry.terraform.io.",
+      "severity": "critical",
+      "tags": [
+        "terraform",
+        "init",
+        "provider"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error: Failed to install provider hashicorp/aws",
+          "Could not retrieve providers locked in the dependency lock file",
+          "terraform init failed with exit code 1"
+        ],
+        "shouldNotMatch": [
+          "Terraform has been successfully initialized",
+          "providers installed successfully"
+        ]
+      }
+    },
+    {
+      "id": "terraform-plan-failed",
+      "category": "Terraform",
+      "priority": 85,
+      "pattern": "Error: .*terraform|\\│ Error:|Planning failed|terraform.*exited with code [^0]",
+      "flags": "i",
+      "rootCause": "Terraform plan failed",
+      "suggestion": "Check the error message above. Run 'terraform plan' locally with the same variables. Verify your cloud credentials are correctly set as secrets.",
+      "severity": "critical",
+      "tags": [
+        "terraform",
+        "plan"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "│ Error: Invalid provider configuration",
+          "Planning failed. Terraform encountered an error",
+          "terraform plan exited with code 1"
+        ],
+        "shouldNotMatch": [
+          "Plan: 2 to add, 0 to change, 0 to destroy",
+          "terraform plan succeeded"
+        ]
+      }
+    },
+    {
+      "id": "terraform-apply-failed",
+      "category": "Terraform",
+      "priority": 80,
+      "pattern": "Apply failed|Error applying plan|terraform apply.*error|Error: creating|Error: deleting",
+      "flags": "i",
+      "rootCause": "Terraform apply failed during infrastructure provisioning",
+      "suggestion": "Check the resource that failed above. Verify IAM permissions for your cloud credentials. Check for resource conflicts or quota limits.",
+      "severity": "critical",
+      "tags": [
+        "terraform",
+        "apply"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Apply failed with 1 error",
+          "Error applying plan: 1 error occurred",
+          "Error: creating EC2 Instance: UnauthorizedOperation"
+        ],
+        "shouldNotMatch": [
+          "Apply complete! Resources: 3 added",
+          "terraform apply succeeded"
+        ]
+      }
+    },
+    {
+      "id": "terraform-state-locked",
+      "category": "Terraform",
+      "priority": 78,
+      "pattern": "Error acquiring the state lock|state is currently locked|lock.*timed? out",
+      "flags": "i",
+      "rootCause": "Terraform state is locked by another process",
+      "suggestion": "Another terraform run may be in progress. Wait for it to complete or manually release the lock with 'terraform force-unlock LOCK_ID'.",
+      "severity": "critical",
+      "tags": [
+        "terraform",
+        "state",
+        "lock"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error acquiring the state lock: ConditionalCheckFailedException",
+          "state is currently locked by another process",
+          "terraform lock timed out after 30s"
+        ],
+        "shouldNotMatch": [
+          "state lock acquired",
+          "terraform apply succeeded"
+        ]
+      }
     },
     {
       "id": "npm-peer-dep",
       "category": "Node.js",
+      "priority": 85,
       "pattern": "npm ERR!.*peer dep|ERESOLVE",
       "flags": "i",
       "rootCause": "npm dependency conflict detected",
-      "suggestion": "Try adding --legacy-peer-deps flag to your npm install command, or update conflicting packages.",
+      "suggestion": "Add --legacy-peer-deps to your npm install command, or update conflicting packages to compatible versions.",
       "severity": "critical",
-      "tags": ["npm", "dependencies"]
+      "tags": [
+        "npm",
+        "dependencies"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "npm ERR! ERESOLVE unable to resolve dependency tree",
+          "npm ERR! peer dep missing: react@^17.0.0"
+        ],
+        "shouldNotMatch": [
+          "npm install completed",
+          "dependencies resolved"
+        ]
+      }
     },
     {
       "id": "npm-module-not-found",
       "category": "Node.js",
+      "priority": 80,
       "pattern": "cannot find module|module not found",
       "flags": "i",
       "rootCause": "A required Node.js module is missing",
-      "suggestion": "Run 'npm install' before your build step, or check that all dependencies are listed in package.json.",
+      "suggestion": "Ensure 'npm install' or 'npm ci' runs before your build step. Check all dependencies are listed in package.json.",
       "severity": "critical",
-      "tags": ["npm", "modules"]
+      "tags": [
+        "npm",
+        "modules"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error: Cannot find module './utils/auth'",
+          "Module not found: Error: Can't resolve 'react-router-dom'"
+        ],
+        "shouldNotMatch": [
+          "module loaded successfully",
+          "all modules resolved"
+        ]
+      }
     },
     {
       "id": "npm-permission",
       "category": "Node.js",
-      "pattern": "EACCES.*permission denied|EPERM",
+      "priority": 75,
+      "pattern": "EACCES.*permission denied|EPERM.*npm",
       "flags": "i",
       "rootCause": "File permission error during npm install",
-      "suggestion": "Avoid running npm with sudo. Check if you need to set NODE_PATH or use a specific Node.js version via actions/setup-node.",
+      "suggestion": "Avoid running npm with sudo. Use actions/setup-node to configure Node.js. Check directory permissions.",
       "severity": "critical",
-      "tags": ["npm", "permissions"]
+      "tags": [
+        "npm",
+        "permissions"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "npm ERR! EACCES: permission denied, access '/usr/local/lib'",
+          "EPERM: operation not permitted, npm install"
+        ],
+        "shouldNotMatch": [
+          "npm install completed successfully",
+          "permissions ok"
+        ]
+      }
     },
     {
-      "id": "test-failure",
-      "category": "Tests",
-      "pattern": "(\\d+) (test|spec|suite)s? failed|FAIL.*\\.test\\.|Tests Failed",
+      "id": "pip-install-failed",
+      "category": "Python",
+      "priority": 85,
+      "pattern": "pip.*error|Could not find a version|No matching distribution|pip.*failed",
       "flags": "i",
-      "rootCause": "One or more tests failed",
-      "suggestion": "Check the test output above for specific failing test names. Run the tests locally with the same environment variables to reproduce.",
+      "rootCause": "Python package installation failed",
+      "suggestion": "Check the package name and version in requirements.txt. Verify the package exists on PyPI with the specified version.",
       "severity": "critical",
-      "tags": ["tests", "jest", "mocha"]
+      "tags": [
+        "python",
+        "pip"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "ERROR: Could not find a version that satisfies the requirement Django==5.0.0",
+          "No matching distribution found for numpy==99.0.0",
+          "pip install failed with exit code 1"
+        ],
+        "shouldNotMatch": [
+          "Successfully installed Django-4.2",
+          "pip install completed"
+        ]
+      }
     },
     {
-      "id": "typescript-error",
-      "category": "Build",
-      "pattern": "TypeScript.*error|TS\\d{4}:",
+      "id": "python-import-error",
+      "category": "Python",
+      "priority": 80,
+      "pattern": "ModuleNotFoundError|ImportError: No module",
       "flags": "i",
-      "rootCause": "TypeScript compilation error",
-      "suggestion": "Fix the TypeScript errors shown above. Run 'tsc --noEmit' locally to see all errors before pushing.",
+      "rootCause": "Python module not found at runtime",
+      "suggestion": "Ensure 'pip install -r requirements.txt' runs before your script. Check for typos in import statements.",
       "severity": "critical",
-      "tags": ["typescript", "build"]
+      "tags": [
+        "python",
+        "import"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "ModuleNotFoundError: No module named 'pandas'",
+          "ImportError: No module named 'requests'"
+        ],
+        "shouldNotMatch": [
+          "import successful",
+          "all modules imported"
+        ]
+      }
     },
     {
-      "id": "syntax-error",
-      "category": "Build",
-      "pattern": "syntax error|SyntaxError",
+      "id": "python-syntax-error",
+      "category": "Python",
+      "priority": 75,
+      "pattern": "SyntaxError:|IndentationError:",
       "flags": "i",
-      "rootCause": "Syntax error in code",
-      "suggestion": "Check the file and line number shown above for syntax errors. Run a linter locally to catch these before pushing.",
+      "rootCause": "Python syntax or indentation error",
+      "suggestion": "Check the file and line number shown above. Run 'python -m py_compile yourfile.py' locally to validate.",
       "severity": "critical",
-      "tags": ["syntax", "build"]
+      "tags": [
+        "python",
+        "syntax"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "SyntaxError: invalid syntax at line 42",
+          "IndentationError: unexpected indent"
+        ],
+        "shouldNotMatch": [
+          "syntax check passed",
+          "no syntax errors"
+        ]
+      }
     },
     {
-      "id": "network-refused",
-      "category": "Network",
-      "pattern": "connection refused|ECONNREFUSED|network.*unreachable",
+      "id": "go-build-failed",
+      "category": "Go",
+      "priority": 85,
+      "pattern": "build failed|cannot find package|undefined:|go: .*error",
       "flags": "i",
-      "rootCause": "Network connection failed",
-      "suggestion": "Check if the target service is running and accessible. For external services, verify the URL and port. Consider adding retry logic.",
+      "rootCause": "Go build failed",
+      "suggestion": "Run 'go build ./...' locally to see all errors. Run 'go mod tidy' to fix missing packages.",
       "severity": "critical",
-      "tags": ["network", "connection"]
+      "tags": [
+        "go",
+        "build"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "build failed: cannot find package github.com/example/lib",
+          "undefined: UserService",
+          "go: error loading module requirements"
+        ],
+        "shouldNotMatch": [
+          "build successful",
+          "go build completed"
+        ]
+      }
     },
     {
-      "id": "rate-limit",
-      "category": "Network",
-      "pattern": "rate limit.*exceeded|API rate limit",
+      "id": "go-test-failed",
+      "category": "Go",
+      "priority": 80,
+      "pattern": "FAIL\\s+\\S+|--- FAIL:",
       "flags": "i",
-      "rootCause": "API rate limit exceeded",
-      "suggestion": "You have hit GitHub's API rate limit. Use GITHUB_TOKEN for authenticated requests (higher limits) or add delays between API calls.",
-      "severity": "warning",
-      "tags": ["network", "rate-limit", "github"]
+      "rootCause": "Go tests failed",
+      "suggestion": "Run 'go test ./...' locally to reproduce. Check failing test names shown above for details.",
+      "severity": "critical",
+      "tags": [
+        "go",
+        "test"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "FAIL github.com/example/myapp 0.023s",
+          "--- FAIL: TestUserService (0.01s)"
+        ],
+        "shouldNotMatch": [
+          "ok github.com/example/myapp",
+          "--- PASS: TestUserService"
+        ]
+      }
+    },
+    {
+      "id": "rust-compile-error",
+      "category": "Rust",
+      "priority": 85,
+      "pattern": "error\\[E\\d+\\]|cargo.*failed|error: aborting due to",
+      "flags": "i",
+      "rootCause": "Rust compilation error",
+      "suggestion": "Run 'cargo build' locally. Use 'rustup update' to ensure correct toolchain. Check error codes at doc.rust-lang.org/error-index.html.",
+      "severity": "critical",
+      "tags": [
+        "rust",
+        "cargo"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "error[E0308]: mismatched types",
+          "cargo build failed with 3 errors",
+          "error: aborting due to 2 previous errors"
+        ],
+        "shouldNotMatch": [
+          "Compiling myapp v1.0.0 (success)",
+          "Finished release target"
+        ]
+      }
     },
     {
       "id": "k8s-image-pull",
       "category": "Kubernetes",
-      "pattern": "imagepullbackoff|errimagepull",
+      "priority": 90,
+      "pattern": "imagepullbackoff|errimagepull|failed to pull image",
       "flags": "i",
       "rootCause": "Kubernetes cannot pull the Docker image",
-      "suggestion": "Check the image name and tag. If using a private registry, ensure the imagePullSecret is configured correctly in your cluster.",
+      "suggestion": "Check the image name and tag. For private registries ensure imagePullSecret is configured. Verify registry credentials.",
       "severity": "critical",
-      "tags": ["kubernetes", "docker", "image"]
+      "tags": [
+        "kubernetes",
+        "docker",
+        "image"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Back-off pulling image myrepo/myapp:latest — ImagePullBackOff",
+          "ErrImagePull: failed to pull image",
+          "failed to pull image myapp:v1.0.0"
+        ],
+        "shouldNotMatch": [
+          "image pulled successfully",
+          "pod running"
+        ]
+      }
     },
     {
       "id": "helm-failure",
       "category": "Kubernetes",
-      "pattern": "helm.*failed|Error: UPGRADE FAILED",
+      "priority": 85,
+      "pattern": "helm.*failed|Error: UPGRADE FAILED|helm deployment timed out",
       "flags": "i",
       "rootCause": "Helm chart deployment failed",
-      "suggestion": "Run 'helm status <release-name>' and 'kubectl describe pod' to get more details. Check if there are resource conflicts.",
+      "suggestion": "Run 'helm status <release>' and 'kubectl describe pod' for more details. Check for resource conflicts or quota limits.",
       "severity": "critical",
-      "tags": ["kubernetes", "helm"]
+      "tags": [
+        "kubernetes",
+        "helm"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error: UPGRADE FAILED: timed out waiting for the condition",
+          "helm install failed with exit code 1",
+          "helm deployment timed out after 300s"
+        ],
+        "shouldNotMatch": [
+          "Release deployed successfully",
+          "helm upgrade completed"
+        ]
+      }
+    },
+    {
+      "id": "gha-missing-secret",
+      "category": "GitHub Actions",
+      "priority": 90,
+      "pattern": "secret.*not.*set|Input required and not supplied|secret.*undefined",
+      "flags": "i",
+      "rootCause": "A required secret or input is missing",
+      "suggestion": "Go to Settings → Secrets → Actions and add the missing secret. Check the action's documentation for all required inputs.",
+      "severity": "critical",
+      "tags": [
+        "actions",
+        "secret",
+        "input"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Error: Input required and not supplied: DOCKER_PASSWORD",
+          "secret GITHUB_TOKEN is not set",
+          "secret AWS_ACCESS_KEY_ID is undefined"
+        ],
+        "shouldNotMatch": [
+          "secrets loaded successfully",
+          "all inputs provided"
+        ]
+      }
+    },
+    {
+      "id": "gha-permission",
+      "category": "GitHub Actions",
+      "priority": 85,
+      "pattern": "resource not accessible by integration|403.*github|insufficient.*permission",
+      "flags": "i",
+      "rootCause": "GitHub token lacks required permissions",
+      "suggestion": "Add required permissions to your workflow job. Example: 'permissions: contents: write, pull-requests: write'.",
+      "severity": "critical",
+      "tags": [
+        "actions",
+        "permissions",
+        "token"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "RequestError: Resource not accessible by integration",
+          "HttpError: 403 Forbidden — insufficient_permissions",
+          "resource not accessible by integration: pull_requests"
+        ],
+        "shouldNotMatch": [
+          "permissions granted",
+          "token valid"
+        ]
+      }
+    },
+    {
+      "id": "gha-timeout",
+      "category": "GitHub Actions",
+      "priority": 75,
+      "pattern": "timeout|timed out after|canceling since.*took longer",
+      "flags": "i",
+      "rootCause": "A step or job exceeded its timeout limit",
+      "suggestion": "Increase 'timeout-minutes' for the step or job. Consider caching dependencies to speed up builds.",
+      "severity": "warning",
+      "tags": [
+        "actions",
+        "timeout"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "The operation timed out after 360000ms",
+          "Canceling since the step took longer than 60 minutes"
+        ],
+        "shouldNotMatch": [
+          "completed in 2m 30s",
+          "step finished successfully"
+        ]
+      }
+    },
+    {
+      "id": "test-failure-generic",
+      "category": "Tests",
+      "priority": 70,
+      "pattern": "[1-9][0-9]* (?:test|spec)s? failed|FAIL[^w].*.test.|test suite failed|Tests Failed: [1-9]",
+      "flags": "i",
+      "rootCause": "One or more tests failed",
+      "suggestion": "Check the failing test names above. Run tests locally with the same environment variables to reproduce the failure.",
+      "severity": "critical",
+      "tags": [
+        "tests"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "3 tests failed",
+          "12 specs failed",
+          "FAIL src/auth/auth.test.ts",
+          "test suite failed to run",
+          "Tests Failed: 5"
+        ],
+        "shouldNotMatch": [
+          "0 tests failed",
+          "all tests passed",
+          "Tests: 10 passed"
+        ]
+      }
+    },
+    {
+      "id": "typescript-error",
+      "category": "Build",
+      "priority": 80,
+      "pattern": "error TS\\d+:|TypeScript.*error|tsc.*failed",
+      "flags": "i",
+      "rootCause": "TypeScript compilation error",
+      "suggestion": "Fix the TypeScript errors shown above. Run 'tsc --noEmit' locally to see all errors before pushing.",
+      "severity": "critical",
+      "tags": [
+        "typescript",
+        "build"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "error TS2322: Type 'string' is not assignable to type 'number'",
+          "TypeScript error in src/index.ts",
+          "tsc failed with 3 errors"
+        ],
+        "shouldNotMatch": [
+          "TypeScript compilation successful",
+          "0 errors"
+        ]
+      }
+    },
+    {
+      "id": "out-of-memory",
+      "category": "Runner",
+      "priority": 85,
+      "pattern": "out of memory|OOMKilled|cannot allocate memory|Killed.*memory",
+      "flags": "i",
+      "rootCause": "Process ran out of memory on the runner",
+      "suggestion": "Use a larger GitHub-hosted runner or self-hosted runner with more RAM. Consider splitting the build into smaller steps.",
+      "severity": "critical",
+      "tags": [
+        "memory",
+        "runner"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "FATAL ERROR: Reached heap limit — out of memory",
+          "OOMKilled: container exceeded memory limit",
+          "cannot allocate memory: 137"
+        ],
+        "shouldNotMatch": [
+          "memory usage: 45%",
+          "memory available: 8GB"
+        ]
+      }
+    },
+    {
+      "id": "network-refused",
+      "category": "Network",
+      "priority": 75,
+      "pattern": "connection refused|ECONNREFUSED|network.*unreachable|failed to connect",
+      "flags": "i",
+      "rootCause": "Network connection failed — target service unreachable",
+      "suggestion": "Check if the target service is running and accessible. Verify the URL and port. Consider adding retry logic with exponential backoff.",
+      "severity": "critical",
+      "tags": [
+        "network",
+        "connection"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:5432",
+          "failed to connect to database: connection refused",
+          "network unreachable: 10.0.0.1"
+        ],
+        "shouldNotMatch": [
+          "connection established",
+          "network ok"
+        ]
+      }
+    },
+    {
+      "id": "rate-limit",
+      "category": "Network",
+      "priority": 70,
+      "pattern": "rate limit.*exceeded|API rate limit|too many requests|429",
+      "flags": "i",
+      "rootCause": "API rate limit exceeded",
+      "suggestion": "Use authenticated requests for higher rate limits. Add delays between API calls or implement exponential backoff.",
+      "severity": "warning",
+      "tags": [
+        "network",
+        "rate-limit"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "API rate limit exceeded for github.com",
+          "429 Too Many Requests",
+          "rate limit exceeded: retry after 60s"
+        ],
+        "shouldNotMatch": [
+          "API call successful",
+          "rate limit: 4500/5000 remaining"
+        ]
+      }
+    },
+    {
+      "id": "exit-code-1",
+      "category": "General",
+      "priority": 10,
+      "pattern": "Process completed with exit code 1|exited with code 1",
+      "flags": "i",
+      "rootCause": "A command exited with a failure code",
+      "suggestion": "The real error is in the lines above this message. Scroll up in the log to find the actual failure.",
+      "severity": "warning",
+      "tags": [
+        "general",
+        "exit-code"
+      ],
+      "tests": {
+        "shouldMatch": [
+          "Process completed with exit code 1",
+          "Command exited with code 1"
+        ],
+        "shouldNotMatch": [
+          "Process completed with exit code 0",
+          "exited successfully"
+        ]
+      }
     }
   ]
 }

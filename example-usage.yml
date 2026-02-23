@@ -1,4 +1,4 @@
-# Example: How to use PipelineLens in your repository
+# Example: How to use AIFailLogLens in your repository
 # Add this to YOUR repo's .github/workflows/ folder
 
 name: CI
@@ -34,7 +34,7 @@ jobs:
           docker build -t myapp:${{ github.sha }} .
           docker push myapp:${{ github.sha }}
 
-  # Add PipelineLens — runs only when the build job fails
+  # Add AIFailLogLens — runs only when the build job fails
   analyze-failure:
     runs-on: ubuntu-latest
     needs: [build]

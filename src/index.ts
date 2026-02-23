@@ -16,7 +16,7 @@ async function run(): Promise<void> {
     const context = github.context
     const { owner, repo } = context.repo
 
-    core.info('🔍 PipelineLens: Starting failure analysis...')
+    core.info('🔍 AIFailLogLens: Starting failure analysis...')
     core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`)
 
     // Load patterns — local + optional remote
@@ -101,7 +101,7 @@ async function run(): Promise<void> {
         })
 
         const existingComment = comments.find(c =>
-          c.body?.includes('PipelineLens — Failure Analysis') &&
+          c.body?.includes('AIFailLogLens — Failure Analysis') &&
           c.body?.includes(job.name)
         )
 
@@ -119,9 +119,9 @@ async function run(): Promise<void> {
       }
     }
 
-    core.info('✅ PipelineLens analysis complete.')
+    core.info('✅ AIFailLogLens analysis complete.')
   } catch (error) {
-    core.setFailed(`PipelineLens failed: ${error instanceof Error ? error.message : String(error)}`)
+    core.setFailed(`AIFailLogLens failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

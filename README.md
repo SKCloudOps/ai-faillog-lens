@@ -5,7 +5,7 @@
 [![GitHub Marketplace](https://img.shields.io/badge/GitHub-Marketplace-blue?logo=github)](https://github.com/marketplace/actions/pipeline-lens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-PipelineLens is a GitHub Action that automatically detects the root cause of pipeline failures and posts a clear, actionable summary directly on your PR — so your team spends less time debugging and more time shipping.
+AIFailLogLens is a GitHub Action that automatically detects the root cause of pipeline failures and posts a clear, actionable summary directly on your PR — so your team spends less time debugging and more time shipping.
 
 **No external API keys. No extra cost. Just add one job to your workflow.**
 
@@ -37,10 +37,10 @@ That's it. `GITHUB_TOKEN` is **automatically available** in every GitHub Actions
 
 ## 💬 What It Posts on Your PR
 
-When a pipeline fails, PipelineLens automatically comments on the PR:
+When a pipeline fails, AIFailLogLens automatically comments on the PR:
 
 ```
-🔴 PipelineLens — Failure Analysis
+🔴 AIFailLogLens — Failure Analysis
 
 Job: `build` · Severity: Critical
 
@@ -61,7 +61,7 @@ For direct commits to `main` (no PR), the analysis appears in the **Job Summary*
 
 ## 🧠 How Suggestions Are Generated
 
-PipelineLens uses a **3-tier system** to generate fix suggestions:
+AIFailLogLens uses a **3-tier system** to generate fix suggestions:
 
 ```
 Tier 1 — Pattern matching (patterns.json)
@@ -84,7 +84,7 @@ Tier 3 — Generic fallback
 
 `GITHUB_TOKEN` is a **short-lived token automatically created by GitHub** at the start of every workflow run. You do not need to create it, pay for it, or manage it.
 
-However, you must explicitly grant the permissions PipelineLens needs:
+However, you must explicitly grant the permissions AIFailLogLens needs:
 
 | Permission | Why It's Needed |
 |---|---|
@@ -92,7 +92,7 @@ However, you must explicitly grant the permissions PipelineLens needs:
 | `pull-requests: write` | Post the analysis comment on the PR |
 | `models: read` | Call GitHub Models AI for unknown errors |
 
-Without `models: read`, the AI fallback is automatically skipped and PipelineLens falls back to pattern matching only — the action still works fine.
+Without `models: read`, the AI fallback is automatically skipped and AIFailLogLens falls back to pattern matching only — the action still works fine.
 
 You can disable AI entirely with `enable-ai: false` if preferred.
 
@@ -157,7 +157,7 @@ Use these in later steps to build custom notifications or integrations:
 
 ## 📋 Adding Custom Patterns
 
-PipelineLens loads error patterns from `patterns.json` in the repo root. You can add your own patterns without touching any TypeScript:
+AIFailLogLens loads error patterns from `patterns.json` in the repo root. You can add your own patterns without touching any TypeScript:
 
 ```json
 {

@@ -30369,8 +30369,8 @@ async function run() {
         const octokit = github.getOctokit(token);
         const context = github.context;
         const { owner, repo } = context.repo;
-        core.info('🔍 PipelineLens: Starting failure analysis...');
-        core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`);
+        core.info('PipelineLens: Starting the failure analysis...');
+        core.info(`AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`);
         // Load patterns — local + optional remote
         const patterns = await (0, analyzer_1.loadPatterns)(remotePatternsUrl || undefined);
         const runId = context.runId;

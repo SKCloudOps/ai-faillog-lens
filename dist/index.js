@@ -30214,7 +30214,7 @@ function formatPRComment(analysis, jobName, runUrl) {
     const errorBlock = analysis.errorLines.length > 0
         ? `\n<details>\n<summary>📋 Error lines detected (${analysis.errorLines.length})</summary>\n\n\`\`\`\n${analysis.errorLines.join('\n')}\n\`\`\`\n</details>`
         : '';
-    return `## ${emoji} AIFailLogLens — Failure Analysis
+    return `## ${emoji} PipelineLens — Failure Analysis
 
 > **Job:** \`${jobName}\` · **Severity:** ${label} · [View full logs](${runUrl})
 
@@ -30231,7 +30231,7 @@ ${analysis.suggestion}
 ${errorBlock}
 
 ---
-<sub>🔬 Analyzed by [AIFailLogLens](https://github.com/your-username/pipeline-lens) · [Report false positive](https://github.com/your-username/pipeline-lens/issues)</sub>`;
+<sub>🔬 Analyzed by [PipelineLens](https://github.com/your-username/pipeline-lens) · [Report false positive](https://github.com/your-username/pipeline-lens/issues)</sub>`;
 }
 function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch, commit, repo) {
     const emoji = SEVERITY_EMOJI[analysis.severity];
@@ -30252,7 +30252,7 @@ function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch,
     const allErrorLines = analysis.errorLines.length > 0
         ? analysis.errorLines.join('\n')
         : 'No error lines captured';
-    return `# ${emoji} AIFailLogLens — Failure Report
+    return `# ${emoji} PipelineLens — Failure Report
 
 > ${emoji} **Severity:** ${label} &nbsp;|&nbsp; 📋 **Job:** \`${jobName}\` &nbsp;|&nbsp; 🕐 **Time:** ${now}
 
@@ -30306,10 +30306,10 @@ ${allErrorLines}
 
 - 🔗 [View full workflow run](${runUrl})
 - 🐛 [Report a false positive](https://github.com/your-username/pipeline-lens/issues)
-- 📖 [AIFailLogLens documentation](https://github.com/your-username/pipeline-lens#readme)
+- 📖 [PipelineLens documentation](https://github.com/your-username/pipeline-lens#readme)
 
 ---
-<sub>🔬 Analyzed by AIFailLogLens · ${now}</sub>`;
+<sub>🔬 Analyzed by PipelineLens · ${now}</sub>`;
 }
 
 
@@ -30369,8 +30369,8 @@ async function run() {
         const octokit = github.getOctokit(token);
         const context = github.context;
         const { owner, repo } = context.repo;
-        core.info('🔍 AIFailLogLens: Starting failure analysis...');
-        core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`);
+        core.info('PipelineLens: Starting the failure analysis...');
+        core.info(`AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`);
         // Load patterns — local + optional remote
         const patterns = await (0, analyzer_1.loadPatterns)(remotePatternsUrl || undefined);
         const runId = context.runId;
@@ -30436,7 +30436,7 @@ async function run() {
                 const { data: comments } = await octokit.rest.issues.listComments({
                     owner, repo, issue_number: prNumber
                 });
-                const existingComment = comments.find(c => c.body?.includes('AIFailLogLens — Failure Analysis') &&
+                const existingComment = comments.find(c => c.body?.includes('PipelineLens — Failure Analysis') &&
                     c.body?.includes(job.name));
                 if (existingComment) {
                     await octokit.rest.issues.updateComment({
@@ -30452,10 +30452,10 @@ async function run() {
                 }
             }
         }
-        core.info('✅ AIFailLogLens analysis complete.');
+        core.info('✅ PipelineLens analysis complete.');
     }
     catch (error) {
-        core.setFailed(`AIFailLogLens failed: ${error instanceof Error ? error.message : String(error)}`);
+        core.setFailed(`PipelineLens failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 run();

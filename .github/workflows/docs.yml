@@ -1,0 +1,27 @@
+name: Auto-generate docs
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  autodocs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      models: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: SKCloudOps/autodocs@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ai-provider: github-models
+          docs-path: docs
+          doc-style: markdown
+          auto-commit: true
+          min-lines: 10

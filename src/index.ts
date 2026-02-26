@@ -16,8 +16,8 @@ async function run(): Promise<void> {
     const context = github.context
     const { owner, repo } = context.repo
 
-    core.info('🔍 PipelineLens: Starting failure analysis...')
-    core.info(`🤖 AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`)
+    core.info('PipelineLens: Starting the failure analysis...')
+    core.info(`AI fallback: ${enableAI ? 'enabled (GitHub Models)' : 'disabled'}`)
 
     // Load patterns — local + optional remote
     const patterns = await loadPatterns(remotePatternsUrl || undefined)

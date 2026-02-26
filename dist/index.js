@@ -30070,12 +30070,19 @@ const fs = __importStar(__nccwpck_require__(9896));
 const path = __importStar(__nccwpck_require__(6928));
 const core = __importStar(__nccwpck_require__(7484));
 const ai_1 = __nccwpck_require__(2382);
+// Strip GitHub Actions log timestamps and ANSI color codes
+function cleanLine(raw) {
+    return raw
+        .replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+/, '') // remove timestamp: 2026-02-22T19:12:50.8020453Z
+        .replace(/\x1b\[[0-9;]*[mGKHF]/g, '') // remove ANSI color codes: \u001b[36;1m
+        .replace(/##\[(?:error|warning|debug|group|endgroup)\]/g, '') // remove GHA annotations
+        .trim();
+}
 function loadLocalPatterns() {
     const localPath = path.join(__dirname, '..', 'patterns.json');
     try {
         if (fs.existsSync(localPath)) {
             const raw = fs.readFileSync(localPath, 'utf-8');
-            // Cast to unknown first, then to our interface — fixes TS2322
             const parsed = JSON.parse(raw);
             core.info(`✅ Loaded ${parsed.patterns.length} patterns from patterns.json (v${parsed.version})`);
             return parsed.patterns;
@@ -30097,7 +30104,6 @@ async function fetchRemotePatterns(remoteUrl) {
             core.warning(`⚠️ Remote patterns fetch failed: HTTP ${response.status}`);
             return [];
         }
-        // Cast to unknown first, then to our interface — fixes TS2322
         const parsed = await response.json();
         core.info(`✅ Loaded ${parsed.patterns.length} remote patterns (v${parsed.version})`);
         return parsed.patterns;
@@ -30124,31 +30130,45 @@ async function loadPatterns(remoteUrl) {
 }
 function extractFailedStep(lines) {
     for (const line of lines) {
-        const match = line.match(/##\[error\].*step[:\s]+(.+)|Run (.+) failed/i);
+        const clean = cleanLine(line);
+        const match = clean.match(/##\[error\].*step[:\s]+(.+)|Run (.+) failed/i);
         if (match)
             return match[1] || match[2];
     }
     return null;
 }
 async function analyzeLogs(logs, patterns, token, useAI, stepName) {
-    const lines = logs.split('\n');
+    const rawLines = logs.split('\n');
+    const totalLines = rawLines.length;
     const errorLines = [];
-    for (const line of lines) {
-        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(line) && line.trim().length > 0) {
-            errorLines.push(line.trim());
+    // Clean and collect error lines with their original line numbers
+    const cleanedLines = rawLines.map((raw, i) => ({
+        cleaned: cleanLine(raw),
+        lineNumber: i + 1
+    }));
+    // Collect lines that look like errors (after cleaning)
+    for (const { cleaned } of cleanedLines) {
+        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(cleaned) && cleaned.length > 0) {
+            errorLines.push(cleaned);
         }
     }
-    // Tier 1 — pattern matching
+    core.info(`📋 Scanned ${totalLines} log lines, found ${errorLines.length} error lines`);
+    // Tier 1 — pattern matching on cleaned lines
     for (const p of patterns) {
         const regex = new RegExp(p.pattern, p.flags);
-        for (const line of errorLines) {
-            if (regex.test(line)) {
-                core.info(`✅ Matched pattern: ${p.id} (${p.category})`);
+        for (const { cleaned, lineNumber } of cleanedLines) {
+            if (cleaned.length === 0)
+                continue;
+            if (regex.test(cleaned)) {
+                core.info(`✅ Matched pattern: ${p.id} (${p.category}) at line ${lineNumber}`);
                 return {
                     rootCause: p.rootCause,
-                    failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                    failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
                     suggestion: p.suggestion,
                     errorLines,
+                    exactMatchLine: cleaned,
+                    exactMatchLineNumber: lineNumber,
+                    totalLines,
                     severity: p.severity,
                     matchedPattern: p.id,
                     category: p.category,
@@ -30164,9 +30184,12 @@ async function analyzeLogs(logs, patterns, token, useAI, stepName) {
         if (aiResult) {
             return {
                 rootCause: aiResult.rootCause,
-                failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
                 suggestion: `${aiResult.suggestion} *(AI-generated, confidence: ${aiResult.confidence})*`,
                 errorLines,
+                exactMatchLine: errorLines[0] || '',
+                exactMatchLineNumber: 0,
+                totalLines,
                 severity: 'warning',
                 matchedPattern: 'ai-generated',
                 category: 'AI Analysis',
@@ -30177,9 +30200,12 @@ async function analyzeLogs(logs, patterns, token, useAI, stepName) {
     // Tier 3 — generic fallback
     return {
         rootCause: 'Unknown failure — could not automatically detect root cause',
-        failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+        failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
         suggestion: 'Review the error lines below. Consider adding a custom pattern to patterns.json to handle this error in future runs.',
         errorLines,
+        exactMatchLine: errorLines[0] || '',
+        exactMatchLineNumber: 0,
+        totalLines,
         severity: 'warning',
         matchedPattern: 'none',
         category: 'Unknown',
@@ -30211,33 +30237,43 @@ const SEVERITY_LABEL = {
 function formatPRComment(analysis, jobName, runUrl) {
     const emoji = SEVERITY_EMOJI[analysis.severity];
     const label = SEVERITY_LABEL[analysis.severity];
-    const errorBlock = analysis.errorLines.length > 0
-        ? `\n<details>\n<summary>📋 Error lines detected (${analysis.errorLines.length})</summary>\n\n\`\`\`\n${analysis.errorLines.join('\n')}\n\`\`\`\n</details>`
+    const exactMatchBlock = analysis.exactMatchLine
+        ? `\n### 🎯 Exact Error Line ${analysis.exactMatchLineNumber > 0 ? `*(line ${analysis.exactMatchLineNumber} of ${analysis.totalLines})*` : ''}
+\`\`\`
+${analysis.exactMatchLine}
+\`\`\``
         : '';
-    return `## ${emoji} PipelineLens — Failure Analysis
+    const errorBlock = analysis.errorLines.length > 0
+        ? `\n<details>\n<summary>📋 All error lines detected (${analysis.errorLines.length})</summary>\n\n\`\`\`\n${analysis.errorLines.join('\n')}\n\`\`\`\n</details>`
+        : '';
+    const aiNote = analysis.aiGenerated
+        ? `\n> 🤖 *This analysis was generated by GitHub Models AI*\n`
+        : '';
+    return `## ${emoji} AI FaillogLens — Failure Analysis
 
-> **Job:** \`${jobName}\` · **Severity:** ${label} · [View full logs](${runUrl})
+> **Job:** \`${jobName}\` · **Severity:** ${label} · **Scanned:** ${analysis.totalLines} log lines · [View full logs](${runUrl})
 
 ---
 
 ### 🔍 Root Cause
 ${analysis.rootCause}
-
+${aiNote}
 ### 📍 Failed Step
 \`${analysis.failedStep}\`
+${exactMatchBlock}
 
 ### 💡 Suggested Fix
 ${analysis.suggestion}
 ${errorBlock}
 
 ---
-<sub>🔬 Analyzed by [PipelineLens](https://github.com/your-username/pipeline-lens) · [Report false positive](https://github.com/your-username/pipeline-lens/issues)</sub>`;
+<sub>🔬 Analyzed by [AI FaillogLens](https://github.com/SKCloudOps/ai-faillog-lens) · [Report false positive](https://github.com/SKCloudOps/ai-faillog-lens/issues)</sub>`;
 }
 function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch, commit, repo) {
     const emoji = SEVERITY_EMOJI[analysis.severity];
     const label = SEVERITY_LABEL[analysis.severity];
     const now = new Date().toUTCString();
-    // Step breakdown table
+    // Step breakdown
     const stepRows = steps.map(step => {
         const icon = step.conclusion === 'success' ? '✅' :
             step.conclusion === 'failure' ? '❌' :
@@ -30246,47 +30282,65 @@ function formatJobSummary(analysis, jobName, runUrl, steps, triggeredBy, branch,
         const duration = step.started_at && step.completed_at
             ? `${Math.round((new Date(step.completed_at).getTime() - new Date(step.started_at).getTime()) / 1000)}s`
             : '—';
-        return `| ${icon} | \`${step.name}\` | ${step.conclusion ?? 'in progress'} | ${duration} |`;
+        const isFailedStep = step.name === analysis.failedStep
+            ? ' ← **failure here**'
+            : '';
+        return `| ${icon} | \`${step.name}\` | ${step.conclusion ?? 'in progress'} | ${duration} |${isFailedStep}`;
     }).join('\n');
-    // All error lines — no truncation
-    const allErrorLines = analysis.errorLines.length > 0
-        ? analysis.errorLines.join('\n')
-        : 'No error lines captured';
-    return `# ${emoji} PipelineLens — Failure Report
-
-> ${emoji} **Severity:** ${label} &nbsp;|&nbsp; 📋 **Job:** \`${jobName}\` &nbsp;|&nbsp; 🕐 **Time:** ${now}
+    // Top 10 error lines only in summary
+    const topErrorLines = analysis.errorLines
+        .slice(0, 10)
+        .join('\n');
+    const aiNote = analysis.aiGenerated
+        ? `> 🤖 This suggestion was generated by **GitHub Models AI** (confidence: see suggestion)\n\n`
+        : `> 🎯 Matched pattern: \`${analysis.matchedPattern}\` · Category: \`${analysis.category}\`\n\n`;
+    return `# ${emoji} AI FaillogLens — Failure Report
 
 ---
 
-## 📊 Run Information
+## 📊 Run Overview
 
-| Field | Value |
+| | |
 |---|---|
 | **Repository** | \`${repo}\` |
 | **Branch** | \`${branch}\` |
-| **Commit** | \`${commit.substring(0, 7)}\` |
+| **Commit** | [\`${commit.substring(0, 7)}\`](https://github.com/${repo}/commit/${commit}) |
 | **Triggered By** | \`${triggeredBy}\` |
-| **Full Logs** | [View on GitHub Actions](${runUrl}) |
+| **Job** | \`${jobName}\` |
+| **Severity** | ${emoji} ${label} |
+| **Log Lines Scanned** | ${analysis.totalLines.toLocaleString()} lines |
+| **Analyzed At** | ${now} |
+| **Full Logs** | [View on GitHub Actions ↗](${runUrl}) |
 
 ---
 
-## 🔍 Failure Analysis
+## 🔍 Root Cause
 
-| Field | Details |
-|---|---|
-| **Root Cause** | ${analysis.rootCause} |
-| **Failed Step** | \`${analysis.failedStep}\` |
-| **Severity** | ${emoji} ${label} |
+> ### ${analysis.rootCause}
+
+${aiNote}
+
+---
+
+## 🎯 Exact Error
+
+${analysis.exactMatchLineNumber > 0
+        ? `Found on **line ${analysis.exactMatchLineNumber}** of ${analysis.totalLines.toLocaleString()}:`
+        : 'Top error line detected:'}
+
+\`\`\`
+${analysis.exactMatchLine || 'No exact match found'}
+\`\`\`
 
 ---
 
 ## 💡 Suggested Fix
 
-> ${analysis.suggestion}
+${analysis.suggestion}
 
 ---
 
-## 🗂️ Step-by-Step Breakdown
+## 🗂️ Step Breakdown
 
 | Status | Step | Result | Duration |
 |---|---|---|---|
@@ -30294,22 +30348,26 @@ ${stepRows}
 
 ---
 
-## 📋 Full Error Log
+## 📋 Error Lines (top 10 of ${analysis.errorLines.length})
 
 \`\`\`
-${allErrorLines}
+${topErrorLines || 'No error lines captured'}
 \`\`\`
 
 ---
 
 ## 🛠️ Quick Actions
 
-- 🔗 [View full workflow run](${runUrl})
-- 🐛 [Report a false positive](https://github.com/your-username/pipeline-lens/issues)
-- 📖 [PipelineLens documentation](https://github.com/your-username/pipeline-lens#readme)
+| Action | Link |
+|---|---|
+| 🔗 View full workflow run | [Open ↗](${runUrl}) |
+| 📋 Add custom pattern | [patterns.json ↗](https://github.com/${repo}/blob/main/patterns.json) |
+| 🐛 Report false positive | [Open issue ↗](https://github.com/SKCloudOps/ai-faillog-lens/issues) |
+| 📖 Documentation | [README ↗](https://github.com/SKCloudOps/ai-faillog-lens#readme) |
 
 ---
-<sub>🔬 Analyzed by PipelineLens · ${now}</sub>`;
+
+<sub>🔬 Analyzed by <a href="https://github.com/SKCloudOps/ai-faillog-lens">AI FaillogLens</a> · ${now}</sub>`;
 }
 
 

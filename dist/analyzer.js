@@ -39,12 +39,19 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const core = __importStar(require("@actions/core"));
 const ai_1 = require("./ai");
+// Strip GitHub Actions log timestamps and ANSI color codes
+function cleanLine(raw) {
+    return raw
+        .replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+/, '') // remove timestamp: 2026-02-22T19:12:50.8020453Z
+        .replace(/\x1b\[[0-9;]*[mGKHF]/g, '') // remove ANSI color codes: \u001b[36;1m
+        .replace(/##\[(?:error|warning|debug|group|endgroup)\]/g, '') // remove GHA annotations
+        .trim();
+}
 function loadLocalPatterns() {
     const localPath = path.join(__dirname, '..', 'patterns.json');
     try {
         if (fs.existsSync(localPath)) {
             const raw = fs.readFileSync(localPath, 'utf-8');
-            // Cast to unknown first, then to our interface — fixes TS2322
             const parsed = JSON.parse(raw);
             core.info(`✅ Loaded ${parsed.patterns.length} patterns from patterns.json (v${parsed.version})`);
             return parsed.patterns;
@@ -66,7 +73,6 @@ async function fetchRemotePatterns(remoteUrl) {
             core.warning(`⚠️ Remote patterns fetch failed: HTTP ${response.status}`);
             return [];
         }
-        // Cast to unknown first, then to our interface — fixes TS2322
         const parsed = await response.json();
         core.info(`✅ Loaded ${parsed.patterns.length} remote patterns (v${parsed.version})`);
         return parsed.patterns;
@@ -93,31 +99,45 @@ async function loadPatterns(remoteUrl) {
 }
 function extractFailedStep(lines) {
     for (const line of lines) {
-        const match = line.match(/##\[error\].*step[:\s]+(.+)|Run (.+) failed/i);
+        const clean = cleanLine(line);
+        const match = clean.match(/##\[error\].*step[:\s]+(.+)|Run (.+) failed/i);
         if (match)
             return match[1] || match[2];
     }
     return null;
 }
 async function analyzeLogs(logs, patterns, token, useAI, stepName) {
-    const lines = logs.split('\n');
+    const rawLines = logs.split('\n');
+    const totalLines = rawLines.length;
     const errorLines = [];
-    for (const line of lines) {
-        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(line) && line.trim().length > 0) {
-            errorLines.push(line.trim());
+    // Clean and collect error lines with their original line numbers
+    const cleanedLines = rawLines.map((raw, i) => ({
+        cleaned: cleanLine(raw),
+        lineNumber: i + 1
+    }));
+    // Collect lines that look like errors (after cleaning)
+    for (const { cleaned } of cleanedLines) {
+        if (/error|failed|fatal|exception|FAIL|ERR!/i.test(cleaned) && cleaned.length > 0) {
+            errorLines.push(cleaned);
         }
     }
-    // Tier 1 — pattern matching
+    core.info(`📋 Scanned ${totalLines} log lines, found ${errorLines.length} error lines`);
+    // Tier 1 — pattern matching on cleaned lines
     for (const p of patterns) {
         const regex = new RegExp(p.pattern, p.flags);
-        for (const line of errorLines) {
-            if (regex.test(line)) {
-                core.info(`✅ Matched pattern: ${p.id} (${p.category})`);
+        for (const { cleaned, lineNumber } of cleanedLines) {
+            if (cleaned.length === 0)
+                continue;
+            if (regex.test(cleaned)) {
+                core.info(`✅ Matched pattern: ${p.id} (${p.category}) at line ${lineNumber}`);
                 return {
                     rootCause: p.rootCause,
-                    failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                    failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
                     suggestion: p.suggestion,
                     errorLines,
+                    exactMatchLine: cleaned,
+                    exactMatchLineNumber: lineNumber,
+                    totalLines,
                     severity: p.severity,
                     matchedPattern: p.id,
                     category: p.category,
@@ -133,9 +153,12 @@ async function analyzeLogs(logs, patterns, token, useAI, stepName) {
         if (aiResult) {
             return {
                 rootCause: aiResult.rootCause,
-                failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+                failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
                 suggestion: `${aiResult.suggestion} *(AI-generated, confidence: ${aiResult.confidence})*`,
                 errorLines,
+                exactMatchLine: errorLines[0] || '',
+                exactMatchLineNumber: 0,
+                totalLines,
                 severity: 'warning',
                 matchedPattern: 'ai-generated',
                 category: 'AI Analysis',
@@ -146,9 +169,12 @@ async function analyzeLogs(logs, patterns, token, useAI, stepName) {
     // Tier 3 — generic fallback
     return {
         rootCause: 'Unknown failure — could not automatically detect root cause',
-        failedStep: stepName || extractFailedStep(lines) || 'Unknown step',
+        failedStep: stepName || extractFailedStep(rawLines) || 'Unknown step',
         suggestion: 'Review the error lines below. Consider adding a custom pattern to patterns.json to handle this error in future runs.',
         errorLines,
+        exactMatchLine: errorLines[0] || '',
+        exactMatchLineNumber: 0,
+        totalLines,
         severity: 'warning',
         matchedPattern: 'none',
         category: 'Unknown',
